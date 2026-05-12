@@ -15,7 +15,7 @@ from flask import Flask, request, render_template_string, abort, redirect
 from github import Github
 
 # -------------------- CONFIGURATION --------------------
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 REPO_NAME = "AliHamza-lab/hackme"
 GITHUB_BRANCH = "main"          # if your default branch is "master", change to "master"
 
